@@ -3,7 +3,7 @@ import { Request, Response, NextFunction, RequestHandler } from "express";
 import jwt_decode from "jwt-decode";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
-import * as queryString from "query-string";
+const queryString = require("query-string");
 import dotenv from "dotenv";
 import axios from "axios";
 import { htmlToText } from "html-to-text";
@@ -18,7 +18,7 @@ export const linkedlnAuth: RequestHandler = async (
   try {
     const authUrl: string =
       "https://www.linkedin.com/oauth/v2/authorization?" +
-      queryString.default.stringify({
+      queryString.stringify({
         response_type: "code",
         client_id: process.env.LINKEDIN_CLIENT_ID,
         redirect_uri: process.env.LINKEDIN_REDIRECT_URI,

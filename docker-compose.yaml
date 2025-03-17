@@ -17,5 +17,5 @@ services:
           memory: 3g
 
 networks:
-  protectAppNetwork:
+  voiceAssistantNetwork:
     driver: bridge

@@ -14,7 +14,7 @@ import helmet from "helmet";
 dotenv.config();
 
 const app: Application = express();
-const PORT: number = parseInt(process.env.PORT) || 5002;
+const PORT: number = parseInt(process.env.PORT) || 5001;
 
 app.use(express.json());
 // Trust first proxy (e.g., NGINX, AWS Load Balancer, Cloudflare)

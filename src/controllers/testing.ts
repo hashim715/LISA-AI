@@ -3,7 +3,7 @@ import { Request, Response, NextFunction, RequestHandler } from "express";
 import jwt_decode from "jwt-decode";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
-const queryString = require("query-string");
+import queryString from "query-string";
 import dotenv from "dotenv";
 import axios from "axios";
 import { htmlToText } from "html-to-text";
@@ -58,7 +58,7 @@ export const linkedlnredirectauth: RequestHandler = async (
 
     const tokenResponse = await axios.post(
       "https://www.linkedin.com/oauth/v2/accessToken",
-      queryString.default.stringify({
+      queryString.stringify({
         grant_type: "authorization_code",
         code: code,
         redirect_uri: process.env.LINKEDIN_REDIRECT_URI,
@@ -115,7 +115,7 @@ export const googleAuth: RequestHandler = async (
   try {
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth?` +
-      queryString.default.stringify({
+      queryString.stringify({
         client_id: process.env.GOOGLE_CLIENT_ID,
         redirect_uri: process.env.GOOGLE_REDIRECT_URI,
         response_type: "code",
@@ -154,7 +154,7 @@ export const googleredirectauth: RequestHandler = async (
 
     const tokenResponse = await axios.post(
       "https://oauth2.googleapis.com/token",
-      queryString.default.stringify({
+      queryString.stringify({
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,

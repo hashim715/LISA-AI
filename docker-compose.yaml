@@ -1,0 +1,21 @@
+version: "3"
+services:
+  voice-assistant-backend:
+    image: voice-assistant-backend
+    container_name: voice-assistant-backend
+    build: .
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5001:5001"
+    networks:
+      - voiceAssistantNetwork
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+
+networks:
+  protectAppNetwork:
+    driver: bridge

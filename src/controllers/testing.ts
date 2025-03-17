@@ -381,7 +381,6 @@ export const getUnreadEmails: RequestHandler = async (
 
     return res.status(200).json({
       success: true,
-      message: userInfoResponse.data,
       emails: filteredUnreadEmails,
     });
   } catch (err) {

@@ -6,6 +6,7 @@ import {
   googleAuth,
   googleredirectauth,
   testingAppRedirect,
+  getUnreadEmails,
 } from "../controllers/testing";
 
 export const testingRouter: Router = express.Router();
@@ -15,3 +16,4 @@ testingRouter.route("/auth/linkedin/callback").get(linkedlnredirectauth);
 testingRouter.route("/auth/google").get(googleAuth);
 testingRouter.route("/auth/google/callback").get(googleredirectauth);
 testingRouter.route("/testappredirect").get(testingAppRedirect);
+testingRouter.route("/getUnreadEmails").get(getUnreadEmails);

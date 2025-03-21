@@ -117,14 +117,14 @@ export const googleAuth: RequestHandler = async (
       `https://accounts.google.com/o/oauth2/v2/auth?` +
       queryString.stringify({
         client_id: process.env.GOOGLE_CLIENT_ID,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        redirect_uri: "http://localhost:5001/v1/testing/auth/google/callback",
         response_type: "code",
-        scope: process.env.GOOGLE_SCOPES, // Add 'https://mail.google.com/' for email access
+        scope: process.env.GOOGLE_SCOPES,
         access_type: "offline", // For refresh tokens
         prompt: "consent", // Forces consent screen for testing
       });
 
-    res.redirect(authUrl);
+    return res.redirect(authUrl);
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -158,15 +158,13 @@ export const googleredirectauth: RequestHandler = async (
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        redirect_uri: "http://localhost:5001/v1/testing/auth/google/callback",
         grant_type: "authorization_code",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
-
-    console.log(access_token);
 
     // Fetch user info
     const userInfoResponse = await axios.get(
@@ -176,6 +174,8 @@ export const googleredirectauth: RequestHandler = async (
         params: { personFields: "names,emailAddresses" }, // Required for People API
       }
     );
+
+    console.log(userInfoResponse.data);
 
     const twentyFourHoursAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
 
@@ -187,8 +187,6 @@ export const googleredirectauth: RequestHandler = async (
         params: { q: "is:unread category:primary", maxResults: 10 }, // Filter for unread, limit to 10
       }
     );
-
-    console.log(listResponse.data);
 
     const messages = listResponse.data.messages || [];
 
@@ -253,11 +251,7 @@ export const googleredirectauth: RequestHandler = async (
       (email: any) => email.timestamp >= twentyFourHoursAgo
     );
 
-    return res.status(200).json({
-      success: true,
-      message: userInfoResponse.data,
-      emails: filteredUnreadEmails,
-    });
+    return res.status(200).json({ success: true, message: access_token });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -294,7 +288,7 @@ export const getUnreadEmails: RequestHandler = async (
 ) => {
   try {
     const access_token =
-      "ya29.a0AeXRPp78AnjX3ZFqbcvZz_R_M2eNQ9zn06WSBNi8OTlT6rwBYnXSCOFnhiDNBoYexZJ9CgtbRuUxoAsEi1Ot3YTPWHRpXb9bJrk9hWPAViu4lwkmK_mKvGmIQMnAFzIxo70s8l9o4v4Zqaf7BdnRT2b-JhrcUW5_5pl9d2_BaCgYKAS4SARMSFQHGX2Mix7YafGJ8n_ZMN-26hIBETA0175";
+      "ya29.a0AeXRPp7dnWo7MR9jBZf08Sd3PsyNsQ7P6lUOOrZ6ySyxsgKOmoXuiz9YOs10bDUUw12qcsN22Yq--ESUR3PIEPtxxtU7Iayf3W4Te_g6zSyY2ntLWQfq4JJoRdwCYST4QFSwRaY1A3w3TgTyLLQ7ABeqIRcEq433XBWgsi6kaCgYKAdYSARESFQHGX2Mi6v7wnsfA5zEk59WPM4jF8Q0175";
 
     // Fetch user info
     const userInfoResponse = await axios.get(
@@ -383,6 +377,57 @@ export const getUnreadEmails: RequestHandler = async (
       success: true,
       emails: filteredUnreadEmails,
     });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const getCalenderEvents: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const access_token =
+      "ya29.a0AeXRPp7dnWo7MR9jBZf08Sd3PsyNsQ7P6lUOOrZ6ySyxsgKOmoXuiz9YOs10bDUUw12qcsN22Yq--ESUR3PIEPtxxtU7Iayf3W4Te_g6zSyY2ntLWQfq4JJoRdwCYST4QFSwRaY1A3w3TgTyLLQ7ABeqIRcEq433XBWgsi6kaCgYKAdYSARESFQHGX2Mi6v7wnsfA5zEk59WPM4jF8Q0175";
+
+    const now = new Date();
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(now.getDate() + 7);
+
+    const timeMin = now.toISOString(); // Start time: Now
+    const timeMax = sevenDaysLater.toISOString(); // End time: 7 days from now
+
+    const response = await axios.get(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
+        timeMin
+      )}&timeMax=${encodeURIComponent(
+        timeMax
+      )}&orderBy=startTime&singleEvents=true`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
+
+    const eventsData: Array<any> = [];
+
+    response.data.items.forEach((item: any) => {
+      eventsData.push({
+        description: item.description,
+        start: item.start,
+        end: item.end,
+      });
+    });
+
+    return res.status(200).json({ success: true, message: eventsData });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

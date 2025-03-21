@@ -25,4 +25,6 @@ model User {
   google_access_token String?
   google_refresh_token String?
   google_token_expiry String?
+  one_time_code String?
+  one_time_code_expiry String?
 }

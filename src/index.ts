@@ -4,12 +4,15 @@ import cors from "cors";
 import http from "http";
 // import { userRouter } from "./routes/userRoutes";
 import { testingRouter } from "./routes/testingRoutes";
+import { authRouter } from "./routes/authRoutes";
 import bodyParser from "body-parser";
 import timeout from "connect-timeout";
 // import { prisma } from "./config/postgres";
 import cron from "node-cron";
 // import { limiter } from "./middleware/rateLimiter";
 import helmet from "helmet";
+import path from "path";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -46,6 +49,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 // app.use("/api/user", userRouter);
 app.use("/v1/testing", testingRouter);
+app.use("/v1/auth", authRouter);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) {

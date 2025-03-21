@@ -27,7 +27,7 @@ export const googleAuth: RequestHandler = async (
         prompt: "consent", // Forces consent screen for testing
       });
 
-    res.redirect(authUrl);
+    return res.status(200).json({ success: true, message: authUrl });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -52,7 +52,49 @@ export const googleredirectauth: RequestHandler = async (
         .json({ success: false, message: "Try again something went wrong!" });
     }
 
-    return res.status(200).json({ success: true, message: "good" });
+    const tokenResponse = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      queryString.stringify({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+
+    const userInfoResponse = await axios.get(
+      "https://people.googleapis.com/v1/people/me",
+      {
+        headers: { Authorization: `Bearer ${access_token}` },
+        params: { personFields: "names,emailAddresses" }, // Required for People API
+      }
+    );
+
+    const username: string = "hashim715";
+
+    const codeToSend = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const currentDate = new Date();
+    const next1Minutes = new Date(currentDate.getTime() + 1 * 60 * 1000);
+
+    // await prisma.user.create({
+    //   data: {
+    //     email: userInfoResponse.data.email,
+    //     username: username,
+    //     google_login: true,
+    //     google_access_token: access_token,
+    //     google_refresh_token: refresh_token,
+    //     google_token_expiry: expires_in,
+    //     one_time_code: codeToSend,
+    //     one_time_code_expiry: next1Minutes.toISOString(),
+    //   },
+    // });
+
+    return res.redirect(`http://localhost:5173?code=${codeToSend}/`);
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

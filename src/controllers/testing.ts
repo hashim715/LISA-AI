@@ -166,6 +166,8 @@ export const googleredirectauth: RequestHandler = async (
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
+    console.log(`refresh ${refresh_token}`);
+
     // Fetch user info
     const userInfoResponse = await axios.get(
       "https://people.googleapis.com/v1/people/me",
@@ -428,6 +430,65 @@ export const getCalenderEvents: RequestHandler = async (
     });
 
     return res.status(200).json({ success: true, message: eventsData });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const refreshGoogleAccessToken: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const refreshToken =
+      "1//096qUR-KjrfRBCgYIARAAGAkSNwF-L9IrcpJzPJ25amxx59K6MOSbkaOBMKD0bqq47ptiUxgz94U9dBNjF54v1Tb7vPOFqUoE7Tc";
+
+    const response = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    return res.status(200).json({ success: true, message: response.data });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const outlookAuth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authUrl =
+      `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+      queryString.stringify({
+        client_id: process.env.OUTLOOK_CLIENT_ID,
+        redirect_uri: "http://localhost:5001/v1/testing/auth/outlook/callback",
+        response_type: "code",
+        scope: process.env.OUTLOOK_SCOPES,
+        access_type: "offline",
+        prompt: "consent",
+      });
+
+    return res.redirect(authUrl);
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

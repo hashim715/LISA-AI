@@ -8,6 +8,8 @@ import {
   testingAppRedirect,
   getUnreadEmails,
   getCalenderEvents,
+  refreshGoogleAccessToken,
+  outlookAuth,
 } from "../controllers/testing";
 
 export const testingRouter: Router = express.Router();
@@ -19,3 +21,5 @@ testingRouter.route("/auth/google/callback").get(googleredirectauth);
 testingRouter.route("/testappredirect").get(testingAppRedirect);
 testingRouter.route("/getUnreadEmails").get(getUnreadEmails);
 testingRouter.route("/getCalenderEvents").get(getCalenderEvents);
+testingRouter.route("/refreshGoogleAccessToken").get(refreshGoogleAccessToken);
+testingRouter.route("/auth/outlook").get(outlookAuth);

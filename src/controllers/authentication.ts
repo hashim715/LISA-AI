@@ -22,7 +22,7 @@ export const googleAuth: RequestHandler = async (
         client_id: process.env.GOOGLE_CLIENT_ID,
         redirect_uri: process.env.GOOGLE_REDIRECT_URI,
         response_type: "code",
-        scope: process.env.GOOGLE_SCOPES, // Add 'https://mail.google.com/' for email access
+        scope: process.env.GOOGLE_SCOPES,
         access_type: "offline", // For refresh tokens
         prompt: "consent", // Forces consent screen for testing
       });

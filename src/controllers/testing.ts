@@ -290,7 +290,7 @@ export const getUnreadEmails: RequestHandler = async (
 ) => {
   try {
     const access_token =
-      "ya29.a0AeXRPp7dnWo7MR9jBZf08Sd3PsyNsQ7P6lUOOrZ6ySyxsgKOmoXuiz9YOs10bDUUw12qcsN22Yq--ESUR3PIEPtxxtU7Iayf3W4Te_g6zSyY2ntLWQfq4JJoRdwCYST4QFSwRaY1A3w3TgTyLLQ7ABeqIRcEq433XBWgsi6kaCgYKAdYSARESFQHGX2Mi6v7wnsfA5zEk59WPM4jF8Q0175";
+      "ya29.a0AeXRPp5xhppabs41LI8qzV-da_mKwCfFPdQRNRkqzWA7HyG4ZKtyZZj442dqAPgeWp3RPhoJt8MyvQVisfxOAkfgvAY3Nerm0yIGdKzeqDpy8ofKyjPUErmPlpgFuoncxA00SZFIN80eeoDIe_EO6WLsZ9yqWJQaMcSgF_RpaCgYKAdwSARESFQHGX2Mi5-o0ZSw-n2GrFic7-lsVEw0175";
 
     // Fetch user info
     const userInfoResponse = await axios.get(
@@ -396,7 +396,7 @@ export const getCalenderEvents: RequestHandler = async (
 ) => {
   try {
     const access_token =
-      "ya29.a0AeXRPp7dnWo7MR9jBZf08Sd3PsyNsQ7P6lUOOrZ6ySyxsgKOmoXuiz9YOs10bDUUw12qcsN22Yq--ESUR3PIEPtxxtU7Iayf3W4Te_g6zSyY2ntLWQfq4JJoRdwCYST4QFSwRaY1A3w3TgTyLLQ7ABeqIRcEq433XBWgsi6kaCgYKAdYSARESFQHGX2Mi6v7wnsfA5zEk59WPM4jF8Q0175";
+      "ya29.a0AeXRPp5xhppabs41LI8qzV-da_mKwCfFPdQRNRkqzWA7HyG4ZKtyZZj442dqAPgeWp3RPhoJt8MyvQVisfxOAkfgvAY3Nerm0yIGdKzeqDpy8ofKyjPUErmPlpgFuoncxA00SZFIN80eeoDIe_EO6WLsZ9yqWJQaMcSgF_RpaCgYKAdwSARESFQHGX2Mi5-o0ZSw-n2GrFic7-lsVEw0175";
 
     const now = new Date();
     const sevenDaysLater = new Date();
@@ -639,7 +639,7 @@ export const getOutlookEvents: RequestHandler = async (
     const endTime = sevenDaysLater.toISOString(); // End after 7 days
 
     // Microsoft Graph API URL for fetching events
-    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location`;
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location,body`;
 
     // API request
     const response = await axios.get(apiUrl, {
@@ -657,22 +657,35 @@ export const getOutlookEvents: RequestHandler = async (
       eventsData = [];
     } else {
       events.forEach((event: any, index: any) => {
+        let bodytext = htmlToText(event.body.content, {
+          wordwrap: 130,
+          preserveNewlines: true,
+          selectors: [
+            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
+            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
+            { selector: "img", format: "skip" }, // Skip tracking pixels
+            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+          ],
+        }).trim();
+
+        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
         eventsData.push({
           Subject: event.subject,
           Start: `${event.start.dateTime} (${event.start.timeZone}`,
           End: `${event.end.dateTime} (${event.end.timeZone}`,
           Location: `${event.location.displayName || "N/A"}`,
+          body: bodytext,
         });
       });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Got next 7 days events",
-        eventsData: eventsData,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Got next 7 days events",
+      eventsData: eventsData,
+    });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

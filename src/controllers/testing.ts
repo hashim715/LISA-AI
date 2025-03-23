@@ -498,3 +498,187 @@ export const outlookAuth: RequestHandler = async (
     }
   }
 };
+
+export const outlookredirectauth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { code } = req.query;
+
+    if (!code) {
+      return res.status(400).send(`Authorization code is missing`);
+    }
+
+    const tokenResponse = await axios.post(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      queryString.stringify({
+        client_id: process.env.OUTLOOK_CLIENT_ID,
+        client_secret: process.env.OUTLOOK_CLIENT_SECRET,
+        code,
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: tokenResponse.data,
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const getOutlookUnreadEmails: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const access_token =
+      "eyJ0eXAiOiJKV1QiLCJub25jZSI6Ik5hem1ZdVJEQVZZRDM1dEtoZHRjUGlUcV93WV90SExVeXZkdTh0NVRrd3ciLCJhbGciOiJSUzI1NiIsIng1dCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSIsImtpZCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSJ9.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC80YjZlYTY0Ni1hYTc2LTQ0YTktYjVkMy1jYWViZjQxNTM1NTYvIiwiaWF0IjoxNzQyNzA5MjI5LCJuYmYiOjE3NDI3MDkyMjksImV4cCI6MTc0MjcxMzk1OSwiYWNjdCI6MCwiYWNyIjoiMSIsImFjcnMiOlsicDEiXSwiYWlvIjoiQVhRQWkvOFpBQUFBYmJ1RDRRSS9VTGtTcm1WSTI4ekUrekdxUVMyL0FLQmY3S0xaanhqSXRqS296T3h1RGdsTGZxU1hoT3FxZEgrTXpUUlh5bG1wRWY1UDVVU2Jjc2xmQnB2QTRKc3BFTGxKYzBERnBJbThHRUt4UW0wWFVhSzhIZzBkbytwS29kQ0w1andvak0zNlZnOTNVSENzbzc5ZmZnPT0iLCJhbXIiOlsicHdkIiwibWZhIl0sImFwcF9kaXNwbGF5bmFtZSI6InZvaWNlLWFzc2lzdGFudCIsImFwcGlkIjoiMjI3MDgzMDItNjQyOS00MTM2LTkzYTEtYjE3ZDA5YTlmMzYyIiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJKYW4iLCJnaXZlbl9uYW1lIjoiQWF6YXIiLCJpZHR5cCI6InVzZXIiLCJpcGFkZHIiOiIxMTkuMTU2LjE1My4yMzUiLCJuYW1lIjoiQWF6YXIgSmFuIiwib2lkIjoiZTkyYTZmNTUtZDM3ZC00YWVhLWE4OTctYWVhNWZlNWY1M2NlIiwicGxhdGYiOiI1IiwicHVpZCI6IjEwMDMyMDA0MTNFNDYxQjEiLCJyaCI6IjEuQVdFQlJxWnVTM2FxcVVTMTA4cnI5QlUxVmdNQUFBQUFBQUFBd0FBQUFBQUFBQUJpQVJkaEFRLiIsInNjcCI6IkNhbGVuZGFycy5SZWFkIENhbGVuZGFycy5SZWFkLlNoYXJlZCBDYWxlbmRhcnMuUmVhZEJhc2ljIENhbGVuZGFycy5SZWFkV3JpdGUgQ2FsZW5kYXJzLlJlYWRXcml0ZS5TaGFyZWQgZW1haWwgTWFpbC5SZWFkIE1haWwuUmVhZC5TaGFyZWQgTWFpbC5SZWFkQmFzaWMgTWFpbC5SZWFkQmFzaWMuU2hhcmVkIE1haWwuUmVhZFdyaXRlIE1haWwuUmVhZFdyaXRlLlNoYXJlZCBNYWlsLlNlbmQgTWFpbC5TZW5kLlNoYXJlZCBvcGVuaWQgcHJvZmlsZSBVc2VyLlJlYWQiLCJzaWQiOiIwMDMxMDJmOS0wNjZjLWVkZjYtYjVlZC01NTdmMzc3MjhkMWYiLCJzaWduaW5fc3RhdGUiOlsia21zaSJdLCJzdWIiOiJBNjFwM2tCREJ1c21ROTJ3ZGJxNzdZTzBhVnhNcnVyajU2aU5JeXlHdnE4IiwidGVuYW50X3JlZ2lvbl9zY29wZSI6Ik5BIiwidGlkIjoiNGI2ZWE2NDYtYWE3Ni00NGE5LWI1ZDMtY2FlYmY0MTUzNTU2IiwidW5pcXVlX25hbWUiOiJhYXphckBjb3Vyc2V4LnVzIiwidXBuIjoiYWF6YXJAY291cnNleC51cyIsInV0aSI6ImxZaE5TdUlOZTBlU3B6alMxNzVKQUEiLCJ2ZXIiOiIxLjAiLCJ3aWRzIjpbIjYyZTkwMzk0LTY5ZjUtNDIzNy05MTkwLTAxMjE3NzE0NWUxMCIsImI3OWZiZjRkLTNlZjktNDY4OS04MTQzLTc2YjE5NGU4NTUwOSJdLCJ4bXNfaWRyZWwiOiIxIDI4IiwieG1zX3N0Ijp7InN1YiI6Ik9OLURJdVlIWm9TZDNmNndpVVdRZlRYZVJlMFV4a21VU3JFLW4zZjZ6WkUifSwieG1zX3RjZHQiOjE3MzMzNjY2ODZ9.SNVO1wOVr3CvGs-6u5pHy_XESDLcIXV2MuFLYEPNihpNPeY5thc9FMcgG8ZuyI2XmzQ98w6BSEeMmmN1KviqwTL6al7UVcHBmcHyoVph7Cr1KSMTdoAfhSn33AHXJ5Hdcwdh79-1-SviH6li2JvrKi_xaxFUKJNgEmdJG20iAXxzGCJqY6ftk6eeAlzO3mfm5WbiZkugFZTKRxTfPaoVBNhW6CgcvCdopnDWwdyvgXoNuEo-ZoNFYQxyZU2pE8uBK2QQueTG0FuFkLBeIoGREv-XYVYG8vHfN3r8Km37wLmrWwOsDDTL6ozyGhZ7HOrLZ1vJesWm-VylvJmboIFTWw";
+
+    // Get the timestamp for 24 hours ago in ISO format
+    const last24Hours = new Date();
+    last24Hours.setDate(last24Hours.getDate() - 1);
+    const last24HoursISO = last24Hours.toISOString(); // Format: YYYY-MM-DDTHH:mm:ss.sssZ
+
+    // Get Inbox Folder ID
+    const inboxResponse = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const inboxFolderId = inboxResponse.data.id; // Inbox folder ID
+
+    // Fetch unread focused emails from inbox (excluding junk)
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and isRead eq false and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    let unReamdEmails: Array<any> = [];
+
+    const emails = response.data.value;
+    if (emails.length === 0) {
+      unReamdEmails = [];
+    } else {
+      emails.forEach((email: any, index: number) => {
+        let body: string = email.body.content;
+
+        let bodytext = htmlToText(body, {
+          wordwrap: 130,
+          preserveNewlines: true,
+          selectors: [
+            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
+            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
+            { selector: "img", format: "skip" }, // Skip tracking pixels
+            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+          ],
+        }).trim();
+
+        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+        unReamdEmails.push({
+          From: email.from.emailAddress.address,
+          Subject: email.subject,
+          Body: bodytext,
+        });
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Got unread emails",
+      unReamdEmails: unReamdEmails,
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const getOutlookEvents: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const access_token =
+      "eyJ0eXAiOiJKV1QiLCJub25jZSI6Ik5hem1ZdVJEQVZZRDM1dEtoZHRjUGlUcV93WV90SExVeXZkdTh0NVRrd3ciLCJhbGciOiJSUzI1NiIsIng1dCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSIsImtpZCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSJ9.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC80YjZlYTY0Ni1hYTc2LTQ0YTktYjVkMy1jYWViZjQxNTM1NTYvIiwiaWF0IjoxNzQyNzA5MjI5LCJuYmYiOjE3NDI3MDkyMjksImV4cCI6MTc0MjcxMzk1OSwiYWNjdCI6MCwiYWNyIjoiMSIsImFjcnMiOlsicDEiXSwiYWlvIjoiQVhRQWkvOFpBQUFBYmJ1RDRRSS9VTGtTcm1WSTI4ekUrekdxUVMyL0FLQmY3S0xaanhqSXRqS296T3h1RGdsTGZxU1hoT3FxZEgrTXpUUlh5bG1wRWY1UDVVU2Jjc2xmQnB2QTRKc3BFTGxKYzBERnBJbThHRUt4UW0wWFVhSzhIZzBkbytwS29kQ0w1andvak0zNlZnOTNVSENzbzc5ZmZnPT0iLCJhbXIiOlsicHdkIiwibWZhIl0sImFwcF9kaXNwbGF5bmFtZSI6InZvaWNlLWFzc2lzdGFudCIsImFwcGlkIjoiMjI3MDgzMDItNjQyOS00MTM2LTkzYTEtYjE3ZDA5YTlmMzYyIiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJKYW4iLCJnaXZlbl9uYW1lIjoiQWF6YXIiLCJpZHR5cCI6InVzZXIiLCJpcGFkZHIiOiIxMTkuMTU2LjE1My4yMzUiLCJuYW1lIjoiQWF6YXIgSmFuIiwib2lkIjoiZTkyYTZmNTUtZDM3ZC00YWVhLWE4OTctYWVhNWZlNWY1M2NlIiwicGxhdGYiOiI1IiwicHVpZCI6IjEwMDMyMDA0MTNFNDYxQjEiLCJyaCI6IjEuQVdFQlJxWnVTM2FxcVVTMTA4cnI5QlUxVmdNQUFBQUFBQUFBd0FBQUFBQUFBQUJpQVJkaEFRLiIsInNjcCI6IkNhbGVuZGFycy5SZWFkIENhbGVuZGFycy5SZWFkLlNoYXJlZCBDYWxlbmRhcnMuUmVhZEJhc2ljIENhbGVuZGFycy5SZWFkV3JpdGUgQ2FsZW5kYXJzLlJlYWRXcml0ZS5TaGFyZWQgZW1haWwgTWFpbC5SZWFkIE1haWwuUmVhZC5TaGFyZWQgTWFpbC5SZWFkQmFzaWMgTWFpbC5SZWFkQmFzaWMuU2hhcmVkIE1haWwuUmVhZFdyaXRlIE1haWwuUmVhZFdyaXRlLlNoYXJlZCBNYWlsLlNlbmQgTWFpbC5TZW5kLlNoYXJlZCBvcGVuaWQgcHJvZmlsZSBVc2VyLlJlYWQiLCJzaWQiOiIwMDMxMDJmOS0wNjZjLWVkZjYtYjVlZC01NTdmMzc3MjhkMWYiLCJzaWduaW5fc3RhdGUiOlsia21zaSJdLCJzdWIiOiJBNjFwM2tCREJ1c21ROTJ3ZGJxNzdZTzBhVnhNcnVyajU2aU5JeXlHdnE4IiwidGVuYW50X3JlZ2lvbl9zY29wZSI6Ik5BIiwidGlkIjoiNGI2ZWE2NDYtYWE3Ni00NGE5LWI1ZDMtY2FlYmY0MTUzNTU2IiwidW5pcXVlX25hbWUiOiJhYXphckBjb3Vyc2V4LnVzIiwidXBuIjoiYWF6YXJAY291cnNleC51cyIsInV0aSI6ImxZaE5TdUlOZTBlU3B6alMxNzVKQUEiLCJ2ZXIiOiIxLjAiLCJ3aWRzIjpbIjYyZTkwMzk0LTY5ZjUtNDIzNy05MTkwLTAxMjE3NzE0NWUxMCIsImI3OWZiZjRkLTNlZjktNDY4OS04MTQzLTc2YjE5NGU4NTUwOSJdLCJ4bXNfaWRyZWwiOiIxIDI4IiwieG1zX3N0Ijp7InN1YiI6Ik9OLURJdVlIWm9TZDNmNndpVVdRZlRYZVJlMFV4a21VU3JFLW4zZjZ6WkUifSwieG1zX3RjZHQiOjE3MzMzNjY2ODZ9.SNVO1wOVr3CvGs-6u5pHy_XESDLcIXV2MuFLYEPNihpNPeY5thc9FMcgG8ZuyI2XmzQ98w6BSEeMmmN1KviqwTL6al7UVcHBmcHyoVph7Cr1KSMTdoAfhSn33AHXJ5Hdcwdh79-1-SviH6li2JvrKi_xaxFUKJNgEmdJG20iAXxzGCJqY6ftk6eeAlzO3mfm5WbiZkugFZTKRxTfPaoVBNhW6CgcvCdopnDWwdyvgXoNuEo-ZoNFYQxyZU2pE8uBK2QQueTG0FuFkLBeIoGREv-XYVYG8vHfN3r8Km37wLmrWwOsDDTL6ozyGhZ7HOrLZ1vJesWm-VylvJmboIFTWw";
+
+    // Get the current date and time in ISO format
+    const now = new Date();
+    const startTime = now.toISOString(); // Start from current time
+
+    // Get the date 7 days from now
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(now.getDate() + 7);
+    const endTime = sevenDaysLater.toISOString(); // End after 7 days
+
+    // Microsoft Graph API URL for fetching events
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location`;
+
+    // API request
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const events = response.data.value;
+
+    let eventsData: Array<any> = [];
+
+    if (events.length === 0) {
+      eventsData = [];
+    } else {
+      events.forEach((event: any, index: any) => {
+        eventsData.push({
+          Subject: event.subject,
+          Start: `${event.start.dateTime} (${event.start.timeZone}`,
+          End: `${event.end.dateTime} (${event.end.timeZone}`,
+          Location: `${event.location.displayName || "N/A"}`,
+        });
+      });
+    }
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Got next 7 days events",
+        eventsData: eventsData,
+      });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};

@@ -890,11 +890,26 @@ export const getGmailOutlookCalenderEvents: RequestHandler = async (
     const googleEventsData: Array<any> = [];
 
     response.data.items.forEach((item: any) => {
-      googleEventsData.push({
-        description: item.description,
-        start: item.start,
-        end: item.end,
-      });
+      // Check if attendees exist and filter only accepted events
+      const attendees = item.attendees[1];
+
+      const isAccepted = attendees.responseStatus === "accepted";
+
+      if (isAccepted) {
+        googleEventsData.push({
+          description: item.summary,
+          start: item.start,
+          end: item.end,
+          status: "Accepted", // Optional: Adding a status field
+        });
+      } else {
+        googleEventsData.push({
+          description: item.summary,
+          start: item.start,
+          end: item.end,
+          status: "Not Accepted", // Optional: Adding a status field
+        });
+      }
     });
 
     const startTime = now.toISOString(); // Start from current time

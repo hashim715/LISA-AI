@@ -695,3 +695,267 @@ export const getOutlookEvents: RequestHandler = async (
     }
   }
 };
+
+export const getGmailOutlookUnreadEmails: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const gmail_access_token: string =
+      "ya29.a0AeXRPp5ikayNQkqAUFABpxTcp9e8ycNIj4JVN9wVOolxk_m_PFBYGPCFqsTT4LtH0GFBAkiIwK2bYDeMDw4CcxcOwi-Ik-rxnKlMiGDHaWqfvLh6POc-V239Elqe5lcsKUnMpsL4hALfHAXnyGeduEXhP74AdXPF2gVS7TdXaCgYKARUSARESFQHGX2MiUCRfKvKj9AAxNTwqt1C23w0175";
+    const outlook_access_token: string =
+      "eyJ0eXAiOiJKV1QiLCJub25jZSI6ImtpMXdLbjZPSkwwcndLbkIxREE1NlA4ODNBMndoWFJ1dmMxOWNmZVBsM1EiLCJhbGciOiJSUzI1NiIsIng1dCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSIsImtpZCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSJ9.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC80YjZlYTY0Ni1hYTc2LTQ0YTktYjVkMy1jYWViZjQxNTM1NTYvIiwiaWF0IjoxNzQyODM2MTAzLCJuYmYiOjE3NDI4MzYxMDMsImV4cCI6MTc0Mjg0MTA5MywiYWNjdCI6MCwiYWNyIjoiMSIsImFjcnMiOlsicDEiXSwiYWlvIjoiQVhRQWkvOFpBQUFBUTVLQWFYajAzN1hKZTBzV05DbysxQmpvUE5VUlpkT2tXQ0k1NEFodXphcGhETzlOSEhMUkcrZ3hyL2xZOXZrcFp3QmpPQ3VPWU9MbnhMczlMMXdFVVQ1L2VCbEtXOWV1c1NNSVhYUkwwTjVqcGtoOE5sbS9oQ1hUWUVYUzdHNjB4RDc0ajEzaVVNUGVBc0haZlFtN2Z3PT0iLCJhbXIiOlsicHdkIiwibWZhIl0sImFwcF9kaXNwbGF5bmFtZSI6InZvaWNlLWFzc2lzdGFudCIsImFwcGlkIjoiMjI3MDgzMDItNjQyOS00MTM2LTkzYTEtYjE3ZDA5YTlmMzYyIiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJKYW4iLCJnaXZlbl9uYW1lIjoiQWF6YXIiLCJpZHR5cCI6InVzZXIiLCJpcGFkZHIiOiIxMTkuMTU2LjE1Mi4xNTMiLCJuYW1lIjoiQWF6YXIgSmFuIiwib2lkIjoiZTkyYTZmNTUtZDM3ZC00YWVhLWE4OTctYWVhNWZlNWY1M2NlIiwicGxhdGYiOiI1IiwicHVpZCI6IjEwMDMyMDA0MTNFNDYxQjEiLCJyaCI6IjEuQVdFQlJxWnVTM2FxcVVTMTA4cnI5QlUxVmdNQUFBQUFBQUFBd0FBQUFBQUFBQUJpQVJkaEFRLiIsInNjcCI6IkNhbGVuZGFycy5SZWFkIENhbGVuZGFycy5SZWFkLlNoYXJlZCBDYWxlbmRhcnMuUmVhZEJhc2ljIENhbGVuZGFycy5SZWFkV3JpdGUgQ2FsZW5kYXJzLlJlYWRXcml0ZS5TaGFyZWQgZW1haWwgTWFpbC5SZWFkIE1haWwuUmVhZC5TaGFyZWQgTWFpbC5SZWFkQmFzaWMgTWFpbC5SZWFkQmFzaWMuU2hhcmVkIE1haWwuUmVhZFdyaXRlIE1haWwuUmVhZFdyaXRlLlNoYXJlZCBNYWlsLlNlbmQgTWFpbC5TZW5kLlNoYXJlZCBvcGVuaWQgcHJvZmlsZSBVc2VyLlJlYWQiLCJzaWQiOiIwMDMxMDJmOS0wNjZjLWVkZjYtYjVlZC01NTdmMzc3MjhkMWYiLCJzaWduaW5fc3RhdGUiOlsia21zaSJdLCJzdWIiOiJBNjFwM2tCREJ1c21ROTJ3ZGJxNzdZTzBhVnhNcnVyajU2aU5JeXlHdnE4IiwidGVuYW50X3JlZ2lvbl9zY29wZSI6Ik5BIiwidGlkIjoiNGI2ZWE2NDYtYWE3Ni00NGE5LWI1ZDMtY2FlYmY0MTUzNTU2IiwidW5pcXVlX25hbWUiOiJhYXphckBjb3Vyc2V4LnVzIiwidXBuIjoiYWF6YXJAY291cnNleC51cyIsInV0aSI6IlNWTUhKakdaYWs2YW84TFJNbWEzQUEiLCJ2ZXIiOiIxLjAiLCJ3aWRzIjpbIjYyZTkwMzk0LTY5ZjUtNDIzNy05MTkwLTAxMjE3NzE0NWUxMCIsImI3OWZiZjRkLTNlZjktNDY4OS04MTQzLTc2YjE5NGU4NTUwOSJdLCJ4bXNfaWRyZWwiOiIyMiAxIiwieG1zX3N0Ijp7InN1YiI6Ik9OLURJdVlIWm9TZDNmNndpVVdRZlRYZVJlMFV4a21VU3JFLW4zZjZ6WkUifSwieG1zX3RjZHQiOjE3MzMzNjY2ODZ9.E85FhSTKXXMh_3RBPJIPSeTMVtPz5wnD3bu_5ErYYXpaa6RyYpO-pzGrUs4VeqiYlc_OnpEWUTJl401pI_50cNiieMkDO8acxjSrhrjDmd3LBqspEIhrQXMNUz1balRO7o0_RMyDVu8VlQl08ocqG33mrn3TGNMxCYB-Iovha4G-PIHjHzPLhxtd2rnkoySKianaSuY5ulb3a2rgcSnTyFdFMW08UWrS4nLdNE1en-sx_U6vrHXEP1DOFREKbGeAVaVmQvmeAdsfk401vQtdjOudirZAicwCJsryOCYz7Olv7J4oRPKPytjbFt9poIC67sbSk9A_JK_2RqiWlDxdDA";
+
+    // Get the timestamp for 24 hours ago in ISO format
+    const last24Hours = new Date();
+    last24Hours.setDate(last24Hours.getDate() - 1);
+    const last24HoursISO = last24Hours.toISOString(); // Format: YYYY-MM-DDTHH:mm:ss.sssZ
+
+    // Get Inbox Folder ID
+    const inboxResponse = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
+      {
+        headers: {
+          Authorization: `Bearer ${outlook_access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const inboxFolderId = inboxResponse.data.id; // Inbox folder ID
+
+    // Fetch unread focused emails from inbox (excluding junk)
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and isRead eq false and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${outlook_access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    let outlookunReamdEmails: Array<any> = [];
+
+    const outlookemails = response.data.value;
+    if (outlookemails.length === 0) {
+      outlookunReamdEmails = [];
+    } else {
+      outlookemails.forEach((email: any, index: number) => {
+        let body: string = email.body.content;
+
+        let bodytext = htmlToText(body, {
+          wordwrap: 130,
+          preserveNewlines: true,
+          selectors: [
+            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
+            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
+            { selector: "img", format: "skip" }, // Skip tracking pixels
+            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+          ],
+        }).trim();
+
+        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+        outlookunReamdEmails.push({
+          From: email.from.emailAddress.address,
+          Subject: email.subject,
+          Body: bodytext,
+        });
+      });
+    }
+
+    const twentyFourHoursAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
+
+    // List unread emails
+    const listResponse = await axios.get(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+      {
+        headers: { Authorization: `Bearer ${gmail_access_token}` },
+        params: { q: "is:unread category:primary", maxResults: 10 }, // Filter for unread, limit to 10
+      }
+    );
+
+    const messages = listResponse.data.messages || [];
+
+    // Fetch details for each unread email
+    const unreadEmails = await Promise.all(
+      messages.map(async (message: any) => {
+        const msgResponse = await axios.get(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+          {
+            headers: { Authorization: `Bearer ${gmail_access_token}` },
+            params: { format: "full" }, // Optimize for headers
+          }
+        );
+
+        const { payload, snippet, internalDate } = msgResponse.data;
+        const headers = payload.headers || [];
+
+        // Extract email body (plain text or HTML)
+        let body = "";
+        if (payload.parts) {
+          // Multipart email (e.g., text/plain and text/html)
+          const textPart = payload.parts.find(
+            (part: any) => part.mimeType === "text/plain"
+          );
+          const htmlPart = payload.parts.find(
+            (part: any) => part.mimeType === "text/html"
+          );
+          body =
+            textPart && textPart.body.data
+              ? decodeBase64Url(textPart.body.data)
+              : htmlPart && htmlPart.body.data
+              ? decodeBase64Url(htmlPart.body.data)
+              : "No readable content";
+        } else if (payload.body && payload.body.data) {
+          // Single-part email (e.g., plain text only)
+          body = decodeBase64Url(payload.body.data);
+        }
+
+        let bodytext = htmlToText(body, {
+          wordwrap: 130,
+          preserveNewlines: true,
+          selectors: [
+            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
+            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
+            { selector: "img", format: "skip" }, // Skip tracking pixels
+            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+          ],
+        }).trim();
+
+        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+        return {
+          id: msgResponse.data.id,
+          body: bodytext,
+          timestamp: new Date(Number(internalDate)),
+        };
+      })
+    );
+
+    const filteredUnreadEmails = unreadEmails.filter(
+      (email: any) => email.timestamp >= twentyFourHoursAgo
+    );
+
+    return res.status(200).json({
+      success: true,
+      outlookEmails: outlookunReamdEmails,
+      gmailEmails: filteredUnreadEmails,
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const getGmailOutlookCalenderEvents: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const gmail_access_token: string =
+      "ya29.a0AeXRPp5ikayNQkqAUFABpxTcp9e8ycNIj4JVN9wVOolxk_m_PFBYGPCFqsTT4LtH0GFBAkiIwK2bYDeMDw4CcxcOwi-Ik-rxnKlMiGDHaWqfvLh6POc-V239Elqe5lcsKUnMpsL4hALfHAXnyGeduEXhP74AdXPF2gVS7TdXaCgYKARUSARESFQHGX2MiUCRfKvKj9AAxNTwqt1C23w0175";
+    const outlook_access_token: string =
+      "eyJ0eXAiOiJKV1QiLCJub25jZSI6ImtpMXdLbjZPSkwwcndLbkIxREE1NlA4ODNBMndoWFJ1dmMxOWNmZVBsM1EiLCJhbGciOiJSUzI1NiIsIng1dCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSIsImtpZCI6IkpETmFfNGk0cjdGZ2lnTDNzSElsSTN4Vi1JVSJ9.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC80YjZlYTY0Ni1hYTc2LTQ0YTktYjVkMy1jYWViZjQxNTM1NTYvIiwiaWF0IjoxNzQyODM2MTAzLCJuYmYiOjE3NDI4MzYxMDMsImV4cCI6MTc0Mjg0MTA5MywiYWNjdCI6MCwiYWNyIjoiMSIsImFjcnMiOlsicDEiXSwiYWlvIjoiQVhRQWkvOFpBQUFBUTVLQWFYajAzN1hKZTBzV05DbysxQmpvUE5VUlpkT2tXQ0k1NEFodXphcGhETzlOSEhMUkcrZ3hyL2xZOXZrcFp3QmpPQ3VPWU9MbnhMczlMMXdFVVQ1L2VCbEtXOWV1c1NNSVhYUkwwTjVqcGtoOE5sbS9oQ1hUWUVYUzdHNjB4RDc0ajEzaVVNUGVBc0haZlFtN2Z3PT0iLCJhbXIiOlsicHdkIiwibWZhIl0sImFwcF9kaXNwbGF5bmFtZSI6InZvaWNlLWFzc2lzdGFudCIsImFwcGlkIjoiMjI3MDgzMDItNjQyOS00MTM2LTkzYTEtYjE3ZDA5YTlmMzYyIiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJKYW4iLCJnaXZlbl9uYW1lIjoiQWF6YXIiLCJpZHR5cCI6InVzZXIiLCJpcGFkZHIiOiIxMTkuMTU2LjE1Mi4xNTMiLCJuYW1lIjoiQWF6YXIgSmFuIiwib2lkIjoiZTkyYTZmNTUtZDM3ZC00YWVhLWE4OTctYWVhNWZlNWY1M2NlIiwicGxhdGYiOiI1IiwicHVpZCI6IjEwMDMyMDA0MTNFNDYxQjEiLCJyaCI6IjEuQVdFQlJxWnVTM2FxcVVTMTA4cnI5QlUxVmdNQUFBQUFBQUFBd0FBQUFBQUFBQUJpQVJkaEFRLiIsInNjcCI6IkNhbGVuZGFycy5SZWFkIENhbGVuZGFycy5SZWFkLlNoYXJlZCBDYWxlbmRhcnMuUmVhZEJhc2ljIENhbGVuZGFycy5SZWFkV3JpdGUgQ2FsZW5kYXJzLlJlYWRXcml0ZS5TaGFyZWQgZW1haWwgTWFpbC5SZWFkIE1haWwuUmVhZC5TaGFyZWQgTWFpbC5SZWFkQmFzaWMgTWFpbC5SZWFkQmFzaWMuU2hhcmVkIE1haWwuUmVhZFdyaXRlIE1haWwuUmVhZFdyaXRlLlNoYXJlZCBNYWlsLlNlbmQgTWFpbC5TZW5kLlNoYXJlZCBvcGVuaWQgcHJvZmlsZSBVc2VyLlJlYWQiLCJzaWQiOiIwMDMxMDJmOS0wNjZjLWVkZjYtYjVlZC01NTdmMzc3MjhkMWYiLCJzaWduaW5fc3RhdGUiOlsia21zaSJdLCJzdWIiOiJBNjFwM2tCREJ1c21ROTJ3ZGJxNzdZTzBhVnhNcnVyajU2aU5JeXlHdnE4IiwidGVuYW50X3JlZ2lvbl9zY29wZSI6Ik5BIiwidGlkIjoiNGI2ZWE2NDYtYWE3Ni00NGE5LWI1ZDMtY2FlYmY0MTUzNTU2IiwidW5pcXVlX25hbWUiOiJhYXphckBjb3Vyc2V4LnVzIiwidXBuIjoiYWF6YXJAY291cnNleC51cyIsInV0aSI6IlNWTUhKakdaYWs2YW84TFJNbWEzQUEiLCJ2ZXIiOiIxLjAiLCJ3aWRzIjpbIjYyZTkwMzk0LTY5ZjUtNDIzNy05MTkwLTAxMjE3NzE0NWUxMCIsImI3OWZiZjRkLTNlZjktNDY4OS04MTQzLTc2YjE5NGU4NTUwOSJdLCJ4bXNfaWRyZWwiOiIyMiAxIiwieG1zX3N0Ijp7InN1YiI6Ik9OLURJdVlIWm9TZDNmNndpVVdRZlRYZVJlMFV4a21VU3JFLW4zZjZ6WkUifSwieG1zX3RjZHQiOjE3MzMzNjY2ODZ9.E85FhSTKXXMh_3RBPJIPSeTMVtPz5wnD3bu_5ErYYXpaa6RyYpO-pzGrUs4VeqiYlc_OnpEWUTJl401pI_50cNiieMkDO8acxjSrhrjDmd3LBqspEIhrQXMNUz1balRO7o0_RMyDVu8VlQl08ocqG33mrn3TGNMxCYB-Iovha4G-PIHjHzPLhxtd2rnkoySKianaSuY5ulb3a2rgcSnTyFdFMW08UWrS4nLdNE1en-sx_U6vrHXEP1DOFREKbGeAVaVmQvmeAdsfk401vQtdjOudirZAicwCJsryOCYz7Olv7J4oRPKPytjbFt9poIC67sbSk9A_JK_2RqiWlDxdDA";
+
+    const now = new Date();
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(now.getDate() + 7);
+
+    const timeMin = now.toISOString(); // Start time: Now
+    const timeMax = sevenDaysLater.toISOString(); // End time: 7 days from now
+
+    const response = await axios.get(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
+        timeMin
+      )}&timeMax=${encodeURIComponent(
+        timeMax
+      )}&orderBy=startTime&singleEvents=true`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${gmail_access_token}`,
+        },
+      }
+    );
+
+    const googleEventsData: Array<any> = [];
+
+    response.data.items.forEach((item: any) => {
+      googleEventsData.push({
+        description: item.description,
+        start: item.start,
+        end: item.end,
+      });
+    });
+
+    const startTime = now.toISOString(); // Start from current time
+
+    sevenDaysLater.setDate(now.getDate() + 7);
+    const endTime = sevenDaysLater.toISOString(); // End after 7 days
+
+    // Microsoft Graph API URL for fetching events
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location,body`;
+
+    // API request
+    const Outlookresponse = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${outlook_access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const events = Outlookresponse.data.value;
+
+    let outlookEventsData: Array<any> = [];
+
+    if (events.length === 0) {
+      outlookEventsData = [];
+    } else {
+      events.forEach((event: any, index: any) => {
+        let bodytext = htmlToText(event.body.content, {
+          wordwrap: 130,
+          preserveNewlines: true,
+          selectors: [
+            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
+            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
+            { selector: "img", format: "skip" }, // Skip tracking pixels
+            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+          ],
+        }).trim();
+
+        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+        outlookEventsData.push({
+          Subject: event.subject,
+          Start: `${event.start.dateTime} (${event.start.timeZone}`,
+          End: `${event.end.dateTime} (${event.end.timeZone}`,
+          Location: `${event.location.displayName || "N/A"}`,
+          body: bodytext,
+        });
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      gmailEvents: googleEventsData,
+      outlookEventsData: outlookEventsData,
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};

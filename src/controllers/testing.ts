@@ -897,17 +897,19 @@ export const getGmailOutlookCalenderEvents: RequestHandler = async (
 
       if (isAccepted) {
         googleEventsData.push({
-          description: item.summary,
+          title: item.summary,
           start: item.start,
           end: item.end,
-          status: "Accepted", // Optional: Adding a status field
+          status: "Accepted",
+          description: item.description,
         });
       } else {
         googleEventsData.push({
-          description: item.summary,
+          title: item.summary,
           start: item.start,
           end: item.end,
-          status: "Not Accepted", // Optional: Adding a status field
+          status: "Not Accepted",
+          description: item.description,
         });
       }
     });

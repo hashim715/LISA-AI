@@ -11,7 +11,6 @@ import {
   notFoundResponse,
   unauthorizedErrorResponse,
 } from "./errors";
-import { Client, iteratePaginatedAPI } from "@notionhq/client";
 
 dotenv.config();
 
@@ -28,9 +27,9 @@ export const googleAuth: RequestHandler = async (
         redirect_uri: process.env.GOOGLE_REDIRECT_URI,
         response_type: "code",
         scope: process.env.GOOGLE_SCOPES,
-        access_type: "offline", // For refresh tokens
+        access_type: "offline",
         prompt: "consent", // Forces consent screen for testing
-      }).toString();
+      });
 
     return res.status(200).json({ success: true, message: authUrl });
   } catch (err) {
@@ -287,15 +286,12 @@ export const getUser: RequestHandler = async (
   try {
     const token = req.cookies.authToken;
 
-    console.log(token);
-
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
     return res.status(200).json({ success: true, message: user });
   } catch (err) {
-    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

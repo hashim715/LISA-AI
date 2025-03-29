@@ -1,8 +1,25 @@
 import express from "express";
 import { Router } from "express";
-import { googleAuth, googleredirectauth } from "../controllers/authentication";
+import {
+  googleAuth,
+  googleredirectauth,
+  outlookAuth,
+  outlookredirectauth,
+  getUser,
+  logOut,
+  refreshToken,
+  notionAuth,
+  integrateNotionAccount,
+} from "../controllers/authentication";
 
 export const authRouter: Router = express.Router();
 
 authRouter.route("/google").get(googleAuth);
-authRouter.route("/google/callback").get(googleredirectauth);
+authRouter.route("/google/callback").post(googleredirectauth);
+authRouter.route("/outlook").get(outlookAuth);
+authRouter.route("/outlook/callback").post(outlookredirectauth);
+authRouter.route("/me").get(getUser);
+authRouter.route("/logout").get(logOut);
+authRouter.route("/refresh").post(refreshToken);
+authRouter.route("/notion").get(notionAuth);
+authRouter.route("/notion/callback").post(integrateNotionAccount);

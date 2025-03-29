@@ -7,6 +7,7 @@ import queryString from "query-string";
 import dotenv from "dotenv";
 import axios from "axios";
 import { htmlToText } from "html-to-text";
+import { Client, iteratePaginatedAPI } from "@notionhq/client";
 
 dotenv.config();
 
@@ -253,7 +254,9 @@ export const googleredirectauth: RequestHandler = async (
       (email: any) => email.timestamp >= twentyFourHoursAgo
     );
 
-    return res.status(200).json({ success: true, message: access_token });
+    return res
+      .status(200)
+      .json({ success: true, message: access_token, expires_in: expires_in });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -290,7 +293,7 @@ export const getUnreadEmails: RequestHandler = async (
 ) => {
   try {
     const access_token =
-      "ya29.a0AeXRPp5xhppabs41LI8qzV-da_mKwCfFPdQRNRkqzWA7HyG4ZKtyZZj442dqAPgeWp3RPhoJt8MyvQVisfxOAkfgvAY3Nerm0yIGdKzeqDpy8ofKyjPUErmPlpgFuoncxA00SZFIN80eeoDIe_EO6WLsZ9yqWJQaMcSgF_RpaCgYKAdwSARESFQHGX2Mi5-o0ZSw-n2GrFic7-lsVEw0175";
+      "ya29.a0AeXRPp5Vi1xpRzrK5ptYaPz06d0ec8GKYJfLCIhMpRZd6goG9aiAet5wl6bQnoxqxoTO62TV8HVgoxMSook537KqSAiUyEEWnJNWRHt3-l7BPeMAMSuWPE1fepcF6VjvJpemMxUsCjz-yY2j97egwDmdifvxiWRXrSBU8tZhaCgYKAb8SARESFQHGX2Mi_HGQRc1acOmGpItAIfJVnA0175";
 
     // Fetch user info
     const userInfoResponse = await axios.get(
@@ -327,6 +330,13 @@ export const getUnreadEmails: RequestHandler = async (
 
         const { payload, snippet, internalDate } = msgResponse.data;
         const headers = payload.headers || [];
+
+        // Extract subject and from fields
+        const subjectHeader = headers.find((h: any) => h.name === "Subject");
+        const fromHeader = headers.find((h: any) => h.name === "From");
+
+        const subject = subjectHeader ? subjectHeader.value : "No Subject";
+        const from = fromHeader ? fromHeader.value : "Unknown Sender";
 
         // Extract email body (plain text or HTML)
         let body = "";
@@ -367,6 +377,8 @@ export const getUnreadEmails: RequestHandler = async (
           id: msgResponse.data.id,
           body: bodytext,
           timestamp: new Date(Number(internalDate)),
+          subject: subject,
+          from: from,
         };
       })
     );
@@ -522,6 +534,12 @@ export const outlookredirectauth: RequestHandler = async (
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
+
+    const { data } = await axios.get("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` },
+    });
+
+    console.log(data);
 
     return res.status(200).json({
       success: true,
@@ -967,6 +985,23 @@ export const getGmailOutlookCalenderEvents: RequestHandler = async (
       gmailEvents: googleEventsData,
       outlookEventsData: outlookEventsData,
     });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Something went wrong" });
+    }
+  }
+};
+
+export const notionClientApiTesting: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const notion = new Client({ auth: "" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

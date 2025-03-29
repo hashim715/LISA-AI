@@ -1,0 +1,30 @@
+import express from "express";
+import { Router } from "express";
+import {
+  getUnreadEmails,
+  getCurrentDateTime,
+  getEmailsUsingSearchQuery,
+  getCalenderEvents,
+  notionClientApiTesting,
+  getProductHuntPosts,
+} from "../controllers/user";
+
+import { protect } from "../middleware/middleware";
+import { refreshAccessToken } from "../middleware/refreshAccessToken";
+
+export const userRouter: Router = express.Router();
+
+userRouter
+  .route("/getUnreadEmails")
+  .get(protect, refreshAccessToken, getUnreadEmails);
+userRouter
+  .route("/getCalenderEvents")
+  .get(protect, refreshAccessToken, getCalenderEvents);
+userRouter
+  .route("/getEmailsUsingSearchQuery/:searchField")
+  .get(protect, refreshAccessToken, getEmailsUsingSearchQuery);
+userRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
+userRouter.route("/notionData").get(protect, notionClientApiTesting);
+userRouter
+  .route("/getProductHuntPosts/:date")
+  .get(protect, getProductHuntPosts);

@@ -5,6 +5,8 @@ import http from "http";
 // import { userRouter } from "./routes/userRoutes";
 import { testingRouter } from "./routes/testingRoutes";
 import { authRouter } from "./routes/authRoutes";
+import { userRouter } from "./routes/userRoutes";
+import { testingUserRouter } from "./routes/testingUserRoutes";
 import bodyParser from "body-parser";
 import timeout from "connect-timeout";
 // import { prisma } from "./config/postgres";
@@ -13,6 +15,7 @@ import cron from "node-cron";
 import helmet from "helmet";
 import path from "path";
 import crypto from "crypto";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -20,10 +23,11 @@ const app: Application = express();
 const PORT: number = parseInt(process.env.PORT) || 5001;
 
 app.use(express.json());
+app.use(cookieParser());
 // Trust first proxy (e.g., NGINX, AWS Load Balancer, Cloudflare)
 app.set("trust proxy", 1);
 app.use(helmet()); // Sets HTTP security headers
-app.use(cors());
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -50,6 +54,8 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // app.use("/api/user", userRouter);
 app.use("/v1/testing", testingRouter);
 app.use("/v1/auth", authRouter);
+app.use("/v1/user", userRouter);
+app.use("/v1/testingUser", testingUserRouter);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) {

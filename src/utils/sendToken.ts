@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../config/postgres";
 import dotenv from "dotenv";
-import { Response } from "express";
 dotenv.config();
 
 const getSignedToken: Function = async (
@@ -12,9 +11,10 @@ const getSignedToken: Function = async (
     process.env.JWT_SECRET_REFRESH,
     { expiresIn: "10d" }
   );
+  const expiryDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
   const user = await prisma.user.update({
     where: { username: username },
-    data: { token: token } as { token: string },
+    data: { token: token, expiresAt: expiryDate.toISOString() },
   });
   const tokens = {
     token: token,
@@ -23,15 +23,10 @@ const getSignedToken: Function = async (
 };
 
 export const sendToken = async (
-  username: string,
-  statusCode: number,
-  res: Response
-): Promise<Response> => {
+  username: string
+): Promise<{ token: string }> => {
   const token = await getSignedToken(username);
-  return res.status(statusCode).json({
-    success: true,
-    token: token.token,
-  });
+  return token;
 };
 
 module.exports = { sendToken };

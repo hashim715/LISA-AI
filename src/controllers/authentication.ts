@@ -1,12 +1,17 @@
 import { prisma } from "../config/postgres";
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import jwt_decode from "jwt-decode";
-import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
-import queryString from "query-string";
 import dotenv from "dotenv";
 import axios from "axios";
-import { htmlToText } from "html-to-text";
+import { sendTokenCookie } from "../utils/sendTokenCookie";
+import {
+  internalServerError,
+  badRequestResponse,
+  notFoundResponse,
+  unauthorizedErrorResponse,
+} from "./errors";
+import { Client, iteratePaginatedAPI } from "@notionhq/client";
 
 dotenv.config();
 
@@ -18,7 +23,7 @@ export const googleAuth: RequestHandler = async (
   try {
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth?` +
-      queryString.stringify({
+      new URLSearchParams({
         client_id: process.env.GOOGLE_CLIENT_ID,
         redirect_uri: process.env.GOOGLE_REDIRECT_URI,
         response_type: "code",
@@ -31,9 +36,7 @@ export const googleAuth: RequestHandler = async (
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
-      return res
-        .status(500)
-        .json({ success: false, message: "Something went wrong" });
+      return internalServerError(res);
     }
   }
 };
@@ -44,17 +47,15 @@ export const googleredirectauth: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { code, error } = req.query;
+    const { code }: { code: string } = req.body;
 
-    if (error) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Try again something went wrong!" });
+    if (!code.trim()) {
+      return badRequestResponse(res, "Try again something went wrong!");
     }
 
     const tokenResponse = await axios.post(
       "https://oauth2.googleapis.com/token",
-      queryString.stringify({
+      new URLSearchParams({
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
@@ -66,41 +67,382 @@ export const googleredirectauth: RequestHandler = async (
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
+    const expiryDate = new Date(Date.now() + parseInt(expires_in) * 1000);
+
     const userInfoResponse = await axios.get(
       "https://people.googleapis.com/v1/people/me",
       {
         headers: { Authorization: `Bearer ${access_token}` },
-        params: { personFields: "names,emailAddresses" }, // Required for People API
+        params: { personFields: "names,emailAddresses" },
       }
     );
 
-    const username: string = "hashim715";
+    const user = await prisma.user.findFirst({
+      where: { email: userInfoResponse.data.emailAddresses[0].value },
+    });
 
-    const codeToSend = Math.floor(100000 + Math.random() * 900000).toString();
+    if (user) {
+      await prisma.user.update({
+        where: { email: user.email },
+        data: {
+          google_access_token: access_token,
+          google_refresh_token: refresh_token,
+          google_token_expiry: expiryDate.toISOString(),
+        },
+      });
 
-    const currentDate = new Date();
-    const next1Minutes = new Date(currentDate.getTime() + 1 * 60 * 1000);
+      await sendTokenCookie(res, user.username);
 
-    // await prisma.user.create({
-    //   data: {
-    //     email: userInfoResponse.data.email,
-    //     username: username,
-    //     google_login: true,
-    //     google_access_token: access_token,
-    //     google_refresh_token: refresh_token,
-    //     google_token_expiry: expires_in,
-    //     one_time_code: codeToSend,
-    //     one_time_code_expiry: next1Minutes.toISOString(),
-    //   },
-    // });
+      return res
+        .status(200)
+        .json({ success: true, message: "Logged in successfully" });
+    }
 
-    return res.redirect(`http://localhost:5173?code=${codeToSend}/`);
+    const uuid = uuidv4();
+
+    const username = uuid;
+
+    const user_ = await prisma.user.findFirst({
+      where: { username: username },
+    });
+
+    if (user_) {
+      return badRequestResponse(res, "Try again something went wrong");
+    }
+
+    await prisma.user.create({
+      data: {
+        email: userInfoResponse.data.emailAddresses[0].value,
+        name: userInfoResponse.data.names[0].displayName,
+        username: username,
+        google_login: true,
+        google_access_token: access_token,
+        google_refresh_token: refresh_token,
+        google_token_expiry: expiryDate.toISOString(),
+      },
+    });
+
+    await sendTokenCookie(res, username);
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged in successfully" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const outlookAuth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authUrl =
+      `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+      new URLSearchParams({
+        client_id: process.env.OUTLOOK_CLIENT_ID,
+        redirect_uri: "http://localhost:5001/v1/testing/auth/outlook/callback",
+        response_type: "code",
+        scope: process.env.OUTLOOK_SCOPES,
+        access_type: "offline",
+        prompt: "consent",
+      });
+
+    return res.status(200).json({ success: true, message: authUrl });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const outlookredirectauth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { code }: { code: string } = req.body;
+
+    if (!code.trim()) {
+      return badRequestResponse(res, "Try again something went wrong!");
+    }
+
+    const tokenResponse = await axios.post(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      new URLSearchParams({
+        client_id: process.env.OUTLOOK_CLIENT_ID,
+        client_secret: process.env.OUTLOOK_CLIENT_SECRET,
+        code,
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+
+    const expiryDate = new Date(Date.now() + expires_in * 1000);
+
+    const { data } = await axios.get("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    const user = await prisma.user.findFirst({
+      where: { email: data.mail },
+    });
+
+    if (user) {
+      await prisma.user.update({
+        where: { email: user.email },
+        data: {
+          outlook_access_token: access_token,
+          outlook_refresh_token: refresh_token,
+          outlook_token_expiry: expiryDate.toISOString(),
+        },
+      });
+
+      await sendTokenCookie(res, user.username);
+
       return res
-        .status(500)
-        .json({ success: false, message: "Something went wrong" });
+        .status(200)
+        .json({ success: true, message: "Logged in successfully" });
+    }
+
+    const uuid = uuidv4();
+
+    const username = uuid;
+
+    const user_ = await prisma.user.findFirst({
+      where: { username: username },
+    });
+
+    if (user_) {
+      return badRequestResponse(res, "Try again something went wrong");
+    }
+
+    await prisma.user.create({
+      data: {
+        email: data.mail,
+        name: data.displayName,
+        username: username,
+        outlook_login: true,
+        outlook_access_token: access_token,
+        outlook_refresh_token: refresh_token,
+        outlook_token_expiry: expiryDate.toISOString(),
+      },
+    });
+
+    await sendTokenCookie(res, username);
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged in successfully" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const integrateOutlookAccount: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const integrateGmailAccount: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const getUser: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    console.log(token);
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    return res.status(200).json({ success: true, message: user });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const logOut: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    await prisma.user.update({
+      where: { username: username },
+      data: { token: null, expiresAt: null },
+    });
+
+    res.clearCookie("authToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged out successfully" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const refreshToken: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const user = await prisma.user.findFirst({ where: { token: token } });
+
+    if (!user) {
+      return badRequestResponse(res, "Invalid refresh token");
+    }
+
+    await sendTokenCookie(res, user.username);
+
+    return res.status(200).json({ success: true, user: user });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const notionAuth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authUrl =
+      `https://api.notion.com/v1/oauth/authorize?` +
+      new URLSearchParams({
+        client_id: process.env.NOTION_CLIENT_ID,
+        redirect_uri: process.env.NOTION_REDIRECT_URI,
+        response_type: "code",
+        owner: "user",
+      });
+
+    return res.status(200).json({ success: true, message: authUrl });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const integrateNotionAccount: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    let { code }: { code: string } = req.body;
+
+    if (!code.trim()) {
+      return unauthorizedErrorResponse(res);
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user) {
+      return notFoundResponse(res);
+    }
+
+    const tokenResponse = await axios.post(
+      "https://api.notion.com/v1/oauth/token",
+      new URLSearchParams({
+        code,
+        redirect_uri: process.env.NOTION_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${Buffer.from(
+            `${process.env.NOTION_CLIENT_ID}:${process.env.NOTION_CLIENT_SECRET}`
+          ).toString("base64")}`,
+        },
+      }
+    );
+
+    const { access_token } = tokenResponse.data;
+
+    const response = await axios.get("https://api.notion.com/v1/users/me", {
+      headers: {
+        Authorization: `Bearer ${access_token}`, // Retrieve from DB
+        "Notion-Version": "2022-06-28",
+      },
+    });
+
+    await prisma.user.update({
+      where: { username: user.username },
+      data: { notion_access_token: access_token, notion_login: true },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Integrated successfully" });
+  } catch (err) {
+    console.log(err.response.data);
+    if (!res.headersSent) {
+      return internalServerError(res);
     }
   }
 };

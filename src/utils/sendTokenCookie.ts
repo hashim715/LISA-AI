@@ -6,7 +6,7 @@ export const sendTokenCookie = async (res: Response, username: string) => {
 
   res.cookie("authToken", token.token, {
     httpOnly: true,
-    secure: false,
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
   });
 };

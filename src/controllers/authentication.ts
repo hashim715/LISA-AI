@@ -30,7 +30,7 @@ export const googleAuth: RequestHandler = async (
         scope: process.env.GOOGLE_SCOPES,
         access_type: "offline", // For refresh tokens
         prompt: "consent", // Forces consent screen for testing
-      });
+      }).toString();
 
     return res.status(200).json({ success: true, message: authUrl });
   } catch (err) {

@@ -292,6 +292,7 @@ export const getUser: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: user });
   } catch (err) {
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

@@ -204,15 +204,20 @@ const getGoogleCalenderEvents = async (
       }
     );
 
-    const eventsData: Array<any> = [];
-
-    response.data.items.forEach((item: any) => {
-      eventsData.push({
-        description: item.description,
-        start: item.start,
-        end: item.end,
-      });
-    });
+    const eventsData: Array<any> = response.data.items.map((item: any) => ({
+      title: item.summary || "No Title", // Event title
+      description: item.description || "No Description", // Event description
+      location: item.location || "No Location", // Event location
+      start: item.start.dateTime || item.start.date, // Start time
+      end: item.end.dateTime || item.end.date, // End time
+      attendees: item.attendees
+        ? item.attendees.map((attendee: any) => ({
+            email: attendee.email,
+            responseStatus: attendee.responseStatus,
+            displayName: attendee.displayName || "No Name",
+          }))
+        : [], // List of attendees
+    }));
 
     return eventsData;
   } catch (err) {

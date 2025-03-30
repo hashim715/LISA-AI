@@ -18,10 +18,11 @@ model User {
   name String
   username String @unique
   email String @unique
+  outlook_email String?
+  google_email String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   token String?
-  isUserRegistered Boolean @default(false)
   google_login Boolean @default(false)
   google_access_token String?
   google_refresh_token String?

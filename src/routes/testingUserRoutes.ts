@@ -18,4 +18,4 @@ testingUserRouter
   .get(getEmailsUsingSearchQuery);
 testingUserRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
 testingUserRouter.route("/notionTesting").get(notionClientApiTesting);
-testingUserRouter.route("/getProductHuntPosts/:date").get(getProductHuntPosts);
+testingUserRouter.route("/getProductHuntPosts/:topic").get(getProductHuntPosts);

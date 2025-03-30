@@ -26,5 +26,5 @@ userRouter
 userRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
 userRouter.route("/notionData").get(protect, notionClientApiTesting);
 userRouter
-  .route("/getProductHuntPosts/:date")
+  .route("/getProductHuntPosts/:topic")
   .get(protect, getProductHuntPosts);

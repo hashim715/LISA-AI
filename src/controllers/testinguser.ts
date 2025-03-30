@@ -17,53 +17,48 @@ import {
   retrieveBlockChildren,
   formatPageContent,
   summarizeWithLLM,
+  summarizeEmailsWithLLM,
 } from "../utils/notionFuncs";
 
 const token =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjVjN2FjNzkzLWYxZGYtNGM5Ni1iOGI0LWE2Y2QyNmI5ODFkYiIsImlhdCI6MTc0MzI3NDc2NSwiZXhwIjoxNzQ0MTM4NzY1fQ.iEovW8MWHBMizTOQl8j6klg-0CvrNRbtDgLKPxWccGI";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjVjN2FjNzkzLWYxZGYtNGM5Ni1iOGI0LWE2Y2QyNmI5ODFkYiIsImlhdCI6MTc0MzMyMTk5NiwiZXhwIjoxNzQ0MTg1OTk2fQ.ko-HeEsJDiHYS1djBqufV-pqhmfwBXxGg8Y3R3_g1tk";
 
 const getGoogleEmails = async (access_token: string): Promise<null | any> => {
   try {
     const last24Hours = new Date();
     last24Hours.setDate(last24Hours.getDate() - 1);
-    const last24HoursISO = last24Hours.toISOString();
 
-    // List unread emails
     const listResponse = await axios.get(
       "https://gmail.googleapis.com/gmail/v1/users/me/messages",
       {
         headers: { Authorization: `Bearer ${access_token}` },
-        params: { q: "is:unread category:primary", maxResults: 10 }, // Filter for unread, limit to 10
+        params: { q: "is:unread category:primary", maxResults: 10 },
       }
     );
 
     const messages = listResponse.data.messages || [];
 
-    // Fetch details for each unread email
     const unreadEmails = await Promise.all(
       messages.map(async (message: any) => {
         const msgResponse = await axios.get(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
           {
             headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" }, // Optimize for headers
+            params: { format: "full" },
           }
         );
 
-        const { payload, snippet, internalDate } = msgResponse.data;
+        const { payload, internalDate } = msgResponse.data;
         const headers = payload.headers || [];
 
-        // Extract subject and from fields
         const subjectHeader = headers.find((h: any) => h.name === "Subject");
         const fromHeader = headers.find((h: any) => h.name === "From");
 
         const subject = subjectHeader ? subjectHeader.value : "No Subject";
         const from = fromHeader ? fromHeader.value : "Unknown Sender";
 
-        // Extract email body (plain text or HTML)
         let body = "";
         if (payload.parts) {
-          // Multipart email (e.g., text/plain and text/html)
           const textPart = payload.parts.find(
             (part: any) => part.mimeType === "text/plain"
           );
@@ -77,7 +72,6 @@ const getGoogleEmails = async (access_token: string): Promise<null | any> => {
               ? decodeBase64Url(htmlPart.body.data)
               : "No readable content";
         } else if (payload.body && payload.body.data) {
-          // Single-part email (e.g., plain text only)
           body = decodeBase64Url(payload.body.data);
         }
 
@@ -85,10 +79,10 @@ const getGoogleEmails = async (access_token: string): Promise<null | any> => {
           wordwrap: 130,
           preserveNewlines: true,
           selectors: [
-            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
-            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
-            { selector: "img", format: "skip" }, // Skip tracking pixels
-            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "div.preview", format: "skip" },
+            { selector: "div.footer", format: "skip" },
+            { selector: "img", format: "skip" },
+            { selector: "style", format: "skip" },
             { selector: "table.emailSeparator-mtbezJ", format: "skip" },
           ],
         }).trim();
@@ -96,10 +90,9 @@ const getGoogleEmails = async (access_token: string): Promise<null | any> => {
         bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
 
         return {
-          id: msgResponse.data.id,
           body: bodytext,
-          timestamp: new Date(Number(internalDate)),
           subject: subject,
+          timestamp: new Date(Number(internalDate)),
           from: from,
         };
       })
@@ -109,7 +102,28 @@ const getGoogleEmails = async (access_token: string): Promise<null | any> => {
       (email: any) => email.timestamp >= last24Hours
     );
 
-    return filteredUnreadEmails;
+    const summarizedEmails: Array<any> = [];
+
+    for (const email of filteredUnreadEmails) {
+      const summary = await summarizeEmailsWithLLM(email.body);
+      if (summary) {
+        summarizedEmails.push({
+          body: summary,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      } else {
+        summarizedEmails.push({
+          body: email.body,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      }
+    }
+
+    return summarizedEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;
@@ -132,9 +146,8 @@ const getOutlookEmails = async (access_token: string): Promise<null | any> => {
       }
     );
 
-    const inboxFolderId = inboxResponse.data.id; // Inbox folder ID
+    const inboxFolderId = inboxResponse.data.id;
 
-    // Fetch unread focused emails from inbox (excluding junk)
     const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and isRead eq false and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
 
     const response = await axios.get(apiUrl, {
@@ -157,10 +170,10 @@ const getOutlookEmails = async (access_token: string): Promise<null | any> => {
           wordwrap: 130,
           preserveNewlines: true,
           selectors: [
-            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
-            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
-            { selector: "img", format: "skip" }, // Skip tracking pixels
-            { selector: "style", format: "skip" }, // Skip CSS
+            { selector: "div.preview", format: "skip" },
+            { selector: "div.footer", format: "skip" },
+            { selector: "img", format: "skip" },
+            { selector: "style", format: "skip" },
             { selector: "table.emailSeparator-mtbezJ", format: "skip" },
           ],
         }).trim();
@@ -168,14 +181,36 @@ const getOutlookEmails = async (access_token: string): Promise<null | any> => {
         bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
 
         outlookunReamdEmails.push({
-          From: email.from.emailAddress.address,
-          Subject: email.subject,
-          Body: bodytext,
+          from: email.from.emailAddress.address,
+          subject: email.subject,
+          timestamp: new Date(email.receivedDateTime),
+          body: bodytext,
         });
       });
     }
 
-    return outlookunReamdEmails;
+    const summarizedEmails: Array<any> = [];
+
+    for (const email of outlookunReamdEmails) {
+      const summary = await summarizeEmailsWithLLM(email.body);
+      if (summary) {
+        summarizedEmails.push({
+          body: summary,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      } else {
+        summarizedEmails.push({
+          body: email.body,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      }
+    }
+
+    return summarizedEmails;
   } catch (err) {
     console.log(err);
     return null;
@@ -190,15 +225,15 @@ const getGoogleCalenderEvents = async (
     const sevenDaysLater = new Date();
     sevenDaysLater.setDate(now.getDate() + 7);
 
-    const timeMin = now.toISOString(); // Start time: Now
-    const timeMax = sevenDaysLater.toISOString(); // End time: 7 days from now
+    const timeMin = now.toISOString();
+    const timeMax = sevenDaysLater.toISOString();
 
     const response = await axios.get(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
         timeMin
       )}&timeMax=${encodeURIComponent(
         timeMax
-      )}&orderBy=startTime&singleEvents=true`,
+      )}&orderBy=startTime&singleEvents=true&maxAttendees=100`,
       {
         method: "GET",
         headers: {
@@ -216,10 +251,9 @@ const getGoogleCalenderEvents = async (
       attendees: item.attendees
         ? item.attendees.map((attendee: any) => ({
             email: attendee.email,
-            displayName: attendee.displayName || "No Name",
-            responseStatus: attendee.responseStatus || "needsAction", // Default status
+            responseStatus: attendee.responseStatus || "needsAction",
           }))
-        : [], // List of attendees
+        : [],
     }));
 
     return eventsData;
@@ -232,19 +266,16 @@ const getOutlookCalenderEvents = async (
   access_token: string
 ): Promise<null | any> => {
   try {
-    // Get the current date and time in ISO format
     const now = new Date();
-    const startTime = now.toISOString(); // Start from current time
+    const startTime = now.toISOString();
 
-    // Get the date 7 days from now
     const sevenDaysLater = new Date();
     sevenDaysLater.setDate(now.getDate() + 7);
-    const endTime = sevenDaysLater.toISOString(); // End after 7 days
+    const endTime = sevenDaysLater.toISOString();
 
     // Microsoft Graph API URL for fetching events
-    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location,body`;
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location,body,attendees`;
 
-    // API request
     const response = await axios.get(apiUrl, {
       headers: {
         Authorization: `Bearer ${access_token}`,
@@ -275,21 +306,19 @@ const getOutlookCalenderEvents = async (
 
       bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
 
-      // Extract attendees
       const attendees =
         event.attendees?.map((attendee: any) => ({
           email: attendee.emailAddress.address,
-          name: attendee.emailAddress.name || "Unknown",
           responseStatus: attendee.status.response || "notResponded",
         })) || [];
 
       eventsData.push({
-        Subject: event.subject || "No Subject",
+        title: event.subject || "No Subject",
         Start: `${event.start.dateTime} (${event.start.timeZone})`,
         End: `${event.end.dateTime} (${event.end.timeZone})`,
         Location: event.location?.displayName || "N/A",
-        body: bodytext,
-        attendees: attendees, // Added attendees
+        description: bodytext,
+        attendees: attendees,
       });
     });
 
@@ -703,6 +732,10 @@ export const notionClientApiTesting: RequestHandler = async (
     // Generate summary
     console.log("\nGenerating summary...");
     const summary = await summarizeWithLLM(allContent);
+    if (!summary) {
+      return badRequestResponse(res, "Try again something went wrong");
+    }
+    console.log("\nDone generating summary...");
 
     return res.status(200).json({ success: true, message: summary });
   } catch (err) {
@@ -719,7 +752,10 @@ export const getProductHuntPosts: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { date } = req.params;
+    const { topic } = req.params;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
 
     const response = await fetch("https://api.producthunt.com/v2/api/graphql", {
       method: "POST",
@@ -729,7 +765,7 @@ export const getProductHuntPosts: RequestHandler = async (
       },
       body: JSON.stringify({
         query: `query {
-          posts(first: 10, order: VOTES, postedAfter: "${date}") {
+          posts(first: 10, order: VOTES, topic: "${topic}", postedAfter: "${yesterday}") {
             edges {
               node {
                 name
@@ -745,26 +781,24 @@ export const getProductHuntPosts: RequestHandler = async (
 
     const result = await response.json();
 
-    // Check for errors
     if (result.errors) {
       return badRequestResponse(res, "Something went wrong");
     }
 
-    // Format the output
-    let output =
-      "🏆 Top 10 Product Hunt Posts (Since ${yesterday_date}) 🏆\n\n";
-    result.data.posts.edges.forEach((edge: any, index: any) => {
-      const post = edge.node;
-      output += `${index + 1}. ${post.name}\n`;
-      output += `   ${post.tagline}\n`;
-      output += `   Number of Votes: ${post.votesCount}\n`;
-      if (post.description) {
-        output += `   ${post.description}\n`;
+    const formattedProducts = result.data.posts.edges.map(
+      (edge: any, index: any) => {
+        const product = edge.node;
+        return {
+          rank: index + 1,
+          name: product.name,
+          tagline: product.tagline,
+          description: product.description,
+          votes: product.votesCount,
+        };
       }
-      output += "---\n";
-    });
+    );
 
-    return res.status(200).json({ success: true, message: output });
+    return res.status(200).json({ success: true, message: formattedProducts });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

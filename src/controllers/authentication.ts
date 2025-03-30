@@ -14,6 +14,123 @@ import {
 
 dotenv.config();
 
+const integrateOutlookAccount = async (
+  code: string,
+  token: string,
+  res: Response
+) => {
+  try {
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user) {
+      return notFoundResponse(res);
+    }
+
+    const tokenResponse = await axios.post(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      new URLSearchParams({
+        client_id: process.env.OUTLOOK_CLIENT_ID,
+        client_secret: process.env.OUTLOOK_CLIENT_SECRET,
+        code,
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+
+    const expiryDate = new Date(Date.now() + expires_in * 1000);
+
+    const { data } = await axios.get("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    await prisma.user.update({
+      where: { username: user.username },
+      data: {
+        outlook_access_token: access_token,
+        outlook_email: data.mail,
+        outlook_refresh_token: refresh_token,
+        outlook_login: true,
+        outlook_token_expiry: expiryDate.toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Outlook account integrated successfully",
+    });
+  } catch (err) {
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+const integrateGmailAccount = async (
+  res: Response,
+  token: string,
+  code: string
+) => {
+  try {
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user) {
+      return notFoundResponse(res);
+    }
+
+    const tokenResponse = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        grant_type: "authorization_code",
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+
+    const expiryDate = new Date(Date.now() + parseInt(expires_in) * 1000);
+
+    const userInfoResponse = await axios.get(
+      "https://people.googleapis.com/v1/people/me",
+      {
+        headers: { Authorization: `Bearer ${access_token}` },
+        params: { personFields: "names,emailAddresses" },
+      }
+    );
+
+    await prisma.user.update({
+      where: { username: user.username },
+      data: {
+        google_access_token: access_token,
+        google_email: userInfoResponse.data.emailAddresses[0].value,
+        google_login: true,
+        google_refresh_token: refresh_token,
+        google_token_expiry: expiryDate.toISOString(),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Google account integrated successfully",
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
 export const googleAuth: RequestHandler = async (
   req: Request,
   res: Response,
@@ -52,6 +169,12 @@ export const googleredirectauth: RequestHandler = async (
       return badRequestResponse(res, "Try again something went wrong!");
     }
 
+    const token = req.cookies.authToken;
+
+    if (token) {
+      return integrateGmailAccount(res, token, code);
+    }
+
     const tokenResponse = await axios.post(
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
@@ -77,7 +200,12 @@ export const googleredirectauth: RequestHandler = async (
     );
 
     const user = await prisma.user.findFirst({
-      where: { email: userInfoResponse.data.emailAddresses[0].value },
+      where: {
+        OR: [
+          { email: userInfoResponse.data.emailAddresses[0].value },
+          { google_email: userInfoResponse.data.emailAddresses[0].value },
+        ],
+      },
     });
 
     if (user) {
@@ -112,6 +240,7 @@ export const googleredirectauth: RequestHandler = async (
     await prisma.user.create({
       data: {
         email: userInfoResponse.data.emailAddresses[0].value,
+        google_email: userInfoResponse.data.emailAddresses[0].value,
         name: userInfoResponse.data.names[0].displayName,
         username: username,
         google_login: true,
@@ -144,7 +273,7 @@ export const outlookAuth: RequestHandler = async (
       `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
       new URLSearchParams({
         client_id: process.env.OUTLOOK_CLIENT_ID,
-        redirect_uri: "http://localhost:5001/v1/testing/auth/outlook/callback",
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
         response_type: "code",
         scope: process.env.OUTLOOK_SCOPES,
         access_type: "offline",
@@ -172,6 +301,12 @@ export const outlookredirectauth: RequestHandler = async (
       return badRequestResponse(res, "Try again something went wrong!");
     }
 
+    const token = req.cookies.authToken;
+
+    if (token) {
+      return integrateOutlookAccount(code, token, res);
+    }
+
     const tokenResponse = await axios.post(
       "https://login.microsoftonline.com/common/oauth2/v2.0/token",
       new URLSearchParams({
@@ -193,7 +328,7 @@ export const outlookredirectauth: RequestHandler = async (
     });
 
     const user = await prisma.user.findFirst({
-      where: { email: data.mail },
+      where: { OR: [{ email: data.mail }, { outlook_email: data.mail }] },
     });
 
     if (user) {
@@ -228,6 +363,7 @@ export const outlookredirectauth: RequestHandler = async (
     await prisma.user.create({
       data: {
         email: data.mail,
+        outlook_email: data.mail,
         name: data.displayName,
         username: username,
         outlook_login: true,
@@ -250,34 +386,6 @@ export const outlookredirectauth: RequestHandler = async (
   }
 };
 
-export const integrateOutlookAccount: RequestHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-  } catch (err) {
-    console.log(err);
-    if (!res.headersSent) {
-      return internalServerError(res);
-    }
-  }
-};
-
-export const integrateGmailAccount: RequestHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-  } catch (err) {
-    console.log(err);
-    if (!res.headersSent) {
-      return internalServerError(res);
-    }
-  }
-};
-
 export const getUser: RequestHandler = async (
   req: Request,
   res: Response,
@@ -285,6 +393,8 @@ export const getUser: RequestHandler = async (
 ) => {
   try {
     const token = req.cookies.authToken;
+
+    console.log(token);
 
     const { username }: { username: string } = jwt_decode(token);
 
@@ -386,7 +496,7 @@ export const integrateNotionAccount: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    let { code }: { code: string } = req.body;
+    const { code }: { code: string } = req.body;
 
     if (!code.trim()) {
       return unauthorizedErrorResponse(res);

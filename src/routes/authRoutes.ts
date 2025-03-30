@@ -12,6 +12,8 @@ import {
   integrateNotionAccount,
 } from "../controllers/authentication";
 
+import { protect } from "../middleware/middleware";
+
 export const authRouter: Router = express.Router();
 
 authRouter.route("/google").get(googleAuth);
@@ -22,4 +24,4 @@ authRouter.route("/me").get(getUser);
 authRouter.route("/logout").get(logOut);
 authRouter.route("/refresh").post(refreshToken);
 authRouter.route("/notion").get(notionAuth);
-authRouter.route("/notion/callback").post(integrateNotionAccount);
+authRouter.route("/notion/callback").post(protect, integrateNotionAccount);

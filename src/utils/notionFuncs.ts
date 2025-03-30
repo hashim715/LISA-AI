@@ -140,7 +140,6 @@ export const retrieveBlockChildren = async (
   level: number = 0,
   notion: Client
 ): Promise<BlockObjectResponse[]> => {
-  console.log(`${" ".repeat(level * 2)}Retrieving blocks for ${id}...`);
   const blocks: BlockObjectResponse[] = [];
 
   try {
@@ -381,7 +380,31 @@ export const summarizeWithLLM = async (allContent: any) => {
 
     return completion.choices[0].message.content;
   } catch (error) {
-    console.error("Error getting summary from LLM:", error);
-    return "Could not generate summary due to an error.";
+    console.log(error);
+    return null;
+  }
+};
+
+export const summarizeEmailsWithLLM = async (email: string) => {
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that analyzes email body and provides clear summaries. Focus on key information, main topics, and important points from each email.",
+        },
+        {
+          role: "user",
+          content: `Please provide a summary of this email:\n\n${email}`,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+    });
+
+    return completion.choices[0].message.content;
+  } catch (error) {
+    console.log(error);
+    return null;
   }
 };

@@ -424,8 +424,8 @@ export const logOut: RequestHandler = async (
 
     res.clearCookie("authToken", {
       httpOnly: true,
-      secure: false,
-      sameSite: "strict",
+      secure: process.env.ENV == "production" ? true : false,
+      sameSite: process.env.ENV == "production" ? "none" : "strict",
     });
 
     return res

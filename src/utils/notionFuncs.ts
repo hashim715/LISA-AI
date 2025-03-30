@@ -379,8 +379,8 @@ export const summarizeWithLLM = async (allContent: any) => {
     });
 
     return completion.choices[0].message.content;
-  } catch (error) {
-    console.log(error);
+  } catch (err) {
+    console.log(err);
     return null;
   }
 };
@@ -403,8 +403,8 @@ export const summarizeEmailsWithLLM = async (email: string) => {
     });
 
     return completion.choices[0].message.content;
-  } catch (error) {
-    console.log(error);
+  } catch (err) {
+    console.log(err);
     return null;
   }
 };

@@ -7,7 +7,6 @@ import { decodeBase64Url } from "../utils/decodeBase64Url";
 import {
   internalServerError,
   badRequestResponse,
-  unauthorizedErrorResponse,
   notFoundResponse,
 } from "./errors";
 import { Client } from "@notionhq/client";
@@ -99,28 +98,28 @@ const getGoogleEmails = async (access_token: string): Promise<null | any> => {
       (email: any) => email.timestamp >= last24Hours
     );
 
-    const summarizedEmails: Array<any> = [];
+    // const summarizedEmails: Array<any> = [];
 
-    for (const email of filteredUnreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
+    // for (const email of filteredUnreadEmails) {
+    //   const summary = await summarizeEmailsWithLLM(email.body);
+    //   if (summary) {
+    //     summarizedEmails.push({
+    //       body: summary,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   } else {
+    //     summarizedEmails.push({
+    //       body: email.body,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   }
+    // }
 
-    return summarizedEmails;
+    return filteredUnreadEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;
@@ -186,28 +185,28 @@ const getOutlookEmails = async (access_token: string): Promise<null | any> => {
       });
     }
 
-    const summarizedEmails: Array<any> = [];
+    // const summarizedEmails: Array<any> = [];
 
-    for (const email of outlookunReamdEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
+    // for (const email of outlookunReamdEmails) {
+    //   const summary = await summarizeEmailsWithLLM(email.body);
+    //   if (summary) {
+    //     summarizedEmails.push({
+    //       body: summary,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   } else {
+    //     summarizedEmails.push({
+    //       body: email.body,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   }
+    // }
 
-    return summarizedEmails;
+    return outlookunReamdEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;
@@ -414,28 +413,28 @@ const getGoogleEmailsFromSpecificSender = async (
         email.from.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const summarizedEmails: Array<any> = [];
+    // const summarizedEmails: Array<any> = [];
 
-    for (const email of filteredUnreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
+    // for (const email of filteredUnreadEmails) {
+    //   const summary = await summarizeEmailsWithLLM(email.body);
+    //   if (summary) {
+    //     summarizedEmails.push({
+    //       body: summary,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   } else {
+    //     summarizedEmails.push({
+    //       body: email.body,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   }
+    // }
 
-    return summarizedEmails;
+    return filteredUnreadEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;
@@ -504,28 +503,28 @@ const getOutlookEmailsFromSpecificSender = async (
       });
     });
 
-    const summarizedEmails: Array<any> = [];
+    // const summarizedEmails: Array<any> = [];
 
-    for (const email of outlookUnreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
+    // for (const email of outlookUnreadEmails) {
+    //   const summary = await summarizeEmailsWithLLM(email.body);
+    //   if (summary) {
+    //     summarizedEmails.push({
+    //       body: summary,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   } else {
+    //     summarizedEmails.push({
+    //       body: email.body,
+    //       subject: email.subject,
+    //       timestamp: email.timestamp,
+    //       from: email.from,
+    //     });
+    //   }
+    // }
 
-    return summarizedEmails;
+    return outlookUnreadEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;

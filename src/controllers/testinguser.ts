@@ -7,7 +7,6 @@ import { decodeBase64Url } from "../utils/decodeBase64Url";
 import {
   internalServerError,
   badRequestResponse,
-  unauthorizedErrorResponse,
   notFoundResponse,
 } from "./errors";
 import { Client } from "@notionhq/client";
@@ -21,7 +20,7 @@ import {
 } from "../utils/notionFuncs";
 
 const token =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjVjN2FjNzkzLWYxZGYtNGM5Ni1iOGI0LWE2Y2QyNmI5ODFkYiIsImlhdCI6MTc0MzMyMTk5NiwiZXhwIjoxNzQ0MTg1OTk2fQ.ko-HeEsJDiHYS1djBqufV-pqhmfwBXxGg8Y3R3_g1tk";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjA3ZmRmMDVlLWVmYTEtNDU4Zi04YWM5LTEyZTc2YzlmNmJiYiIsImlhdCI6MTc0MzM1OTE5MiwiZXhwIjoxNzQ0MjIzMTkyfQ.eu3o_R9HZGDshu2eZSmvuvv4c2nwGTyNFbv1PxaSGRA";
 
 const getGoogleEmails = async (access_token: string): Promise<null | any> => {
   try {
@@ -338,13 +337,12 @@ const getGoogleEmailsFromSpecificSender = async (
     const last24Hours = new Date();
     last24Hours.setDate(last24Hours.getDate() - 1);
 
-    // Search for emails using the name
     const listResponse = await axios.get(
       "https://gmail.googleapis.com/gmail/v1/users/me/messages",
       {
         headers: { Authorization: `Bearer ${access_token}` },
         params: {
-          q: `"${searchQuery}" category:primary`, // Search for the name
+          q: `"${searchQuery}" category:primary`,
           maxResults: 10,
         },
       }
@@ -365,7 +363,6 @@ const getGoogleEmailsFromSpecificSender = async (
         const { payload, snippet, internalDate } = msgResponse.data;
         const headers = payload.headers || [];
 
-        // Extract subject and from fields
         const subjectHeader = headers.find((h: any) => h.name === "Subject");
         const fromHeader = headers.find((h: any) => h.name === "From");
 
@@ -405,7 +402,6 @@ const getGoogleEmailsFromSpecificSender = async (
         bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
 
         return {
-          id: msgResponse.data.id,
           body: bodytext,
           timestamp: new Date(Number(internalDate)),
           subject: subject,
@@ -414,14 +410,34 @@ const getGoogleEmailsFromSpecificSender = async (
       })
     );
 
-    // Filter emails where the sender's name contains "Aazar"
     const filteredUnreadEmails = unreadEmails.filter(
       (email: any) =>
         email.timestamp >= last24Hours &&
         email.from.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    return filteredUnreadEmails;
+    const summarizedEmails: Array<any> = [];
+
+    for (const email of filteredUnreadEmails) {
+      const summary = await summarizeEmailsWithLLM(email.body);
+      if (summary) {
+        summarizedEmails.push({
+          body: summary,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      } else {
+        summarizedEmails.push({
+          body: email.body,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      }
+    }
+
+    return summarizedEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;
@@ -447,9 +463,8 @@ const getOutlookEmailsFromSpecificSender = async (
       }
     );
 
-    const inboxFolderId = inboxResponse.data.id; // Inbox folder ID
+    const inboxFolderId = inboxResponse.data.id;
 
-    // Update the API URL to search by sender's name instead of email
     const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and contains(from/emailAddress/name, '${searchName}') and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
 
     const response = await axios.get(apiUrl, {
@@ -462,6 +477,7 @@ const getOutlookEmailsFromSpecificSender = async (
     let outlookUnreadEmails: Array<any> = [];
 
     const outlookemails = response.data.value;
+
     if (outlookemails.length === 0) {
       return [];
     }
@@ -473,10 +489,10 @@ const getOutlookEmailsFromSpecificSender = async (
         wordwrap: 130,
         preserveNewlines: true,
         selectors: [
-          { selector: "div.preview", format: "skip" }, // Skip hidden preview text
-          { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
-          { selector: "img", format: "skip" }, // Skip tracking pixels
-          { selector: "style", format: "skip" }, // Skip CSS
+          { selector: "div.preview", format: "skip" },
+          { selector: "div.footer", format: "skip" },
+          { selector: "img", format: "skip" },
+          { selector: "style", format: "skip" },
           { selector: "table.emailSeparator-mtbezJ", format: "skip" },
         ],
       }).trim();
@@ -484,15 +500,35 @@ const getOutlookEmailsFromSpecificSender = async (
       bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
 
       outlookUnreadEmails.push({
-        From: email.from.emailAddress.name, // Use sender's name
-        Email: email.from.emailAddress.address, // Include sender's email
+        From: email.from.emailAddress.name,
         Subject: email.subject,
         Body: bodytext,
-        Timestamp: email.receivedDateTime,
+        Timestamp: new Date(email.receivedDateTime),
       });
     });
 
-    return outlookUnreadEmails;
+    const summarizedEmails: Array<any> = [];
+
+    for (const email of outlookUnreadEmails) {
+      const summary = await summarizeEmailsWithLLM(email.body);
+      if (summary) {
+        summarizedEmails.push({
+          body: summary,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      } else {
+        summarizedEmails.push({
+          body: email.body,
+          subject: email.subject,
+          timestamp: email.timestamp,
+          from: email.from,
+        });
+      }
+    }
+
+    return summarizedEmails;
   } catch (err) {
     console.log(err.response.data);
     return null;
@@ -668,7 +704,7 @@ export const getCurrentDateTime: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const currentDateTime = new Date().toISOString();
+    const currentDateTime = new Date().toLocaleString();
 
     return res.status(200).json({ date: currentDateTime });
   } catch (err) {
@@ -708,20 +744,12 @@ export const notionClientApiTesting: RequestHandler = async (
 
     let allContent = "";
 
-    // Process each result
     for (const item of searchResponse.results as any) {
       if (item.object === "database") {
-        console.log(
-          `\nProcessing database: ${
-            item.title[0]?.plain_text || "Untitled Database"
-          }`
-        );
         const databaseContent = await extractDatabaseContent(item.id, notion);
         allContent += databaseContent + "\n\n";
       } else if (item.object === "page") {
         const pageTitle = getPageTitle(item);
-        console.log(`\nProcessing page: ${pageTitle}`);
-        console.log(`Page URL: ${item.url}`);
 
         const blocks = await retrieveBlockChildren(item.id, 0, notion);
         const pageContent = formatPageContent(item, blocks);
@@ -729,7 +757,6 @@ export const notionClientApiTesting: RequestHandler = async (
       }
     }
 
-    // Generate summary
     console.log("\nGenerating summary...");
     const summary = await summarizeWithLLM(allContent);
     if (!summary) {
@@ -739,7 +766,6 @@ export const notionClientApiTesting: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: summary });
   } catch (err) {
-    console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
     }

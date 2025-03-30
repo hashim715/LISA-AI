@@ -394,8 +394,6 @@ export const getUser: RequestHandler = async (
   try {
     const token = req.cookies.authToken;
 
-    console.log(token);
-
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });

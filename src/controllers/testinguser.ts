@@ -212,7 +212,7 @@ const getOutlookEmails = async (access_token: string): Promise<null | any> => {
 
     return summarizedEmails;
   } catch (err) {
-    console.log(err);
+    console.log(err.response.data);
     return null;
   }
 };
@@ -258,6 +258,7 @@ const getGoogleCalenderEvents = async (
 
     return eventsData;
   } catch (err) {
+    console.log(err.response.data);
     return null;
   }
 };
@@ -324,6 +325,7 @@ const getOutlookCalenderEvents = async (
 
     return eventsData;
   } catch (err) {
+    console.log(err.response.data);
     return null;
   }
 };
@@ -421,7 +423,7 @@ const getGoogleEmailsFromSpecificSender = async (
 
     return filteredUnreadEmails;
   } catch (err) {
-    console.log(err);
+    console.log(err.response.data);
     return null;
   }
 };
@@ -492,7 +494,7 @@ const getOutlookEmailsFromSpecificSender = async (
 
     return outlookUnreadEmails;
   } catch (err) {
-    console.log(err);
+    console.log(err.response.data);
     return null;
   }
 };
@@ -540,7 +542,6 @@ export const getUnreadEmails: RequestHandler = async (
         : [],
     });
   } catch (err) {
-    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -602,7 +603,6 @@ export const getEmailsUsingSearchQuery: RequestHandler = async (
         : [],
     });
   } catch (err) {
-    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -739,7 +739,7 @@ export const notionClientApiTesting: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: summary });
   } catch (err) {
-    console.log(err);
+    console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -800,7 +800,7 @@ export const getProductHuntPosts: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: formattedProducts });
   } catch (err) {
-    console.log(err);
+    console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
     }

@@ -31,7 +31,6 @@ export const protect = async (
     }
     next();
   } catch (err) {
-    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

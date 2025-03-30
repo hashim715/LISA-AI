@@ -64,6 +64,7 @@ const integrateOutlookAccount = async (
       message: "Outlook account integrated successfully",
     });
   } catch (err) {
+    console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -124,7 +125,7 @@ const integrateGmailAccount = async (
       message: "Google account integrated successfully",
     });
   } catch (err) {
-    console.log(err);
+    console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
     }

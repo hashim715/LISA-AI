@@ -32,6 +32,7 @@ const refreshGoogleAccessToken = async (
 
     return response.data;
   } catch (err) {
+    console.log(err.response.data);
     return null;
   }
 };
@@ -54,6 +55,7 @@ const refreshOutlookAccessToken = async (
 
     return response.data;
   } catch (err) {
+    console.log(err.response.data);
     return null;
   }
 };
@@ -64,7 +66,7 @@ export const refreshAccessToken: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    let token = req.cookies.authToken; // Get token from HTTP-only cookie
+    let token = req.cookies.authToken;
 
     if (!token) {
       return unauthorizedErrorResponse(res);

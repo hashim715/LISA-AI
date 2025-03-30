@@ -213,8 +213,8 @@ const getGoogleCalenderEvents = async (
       attendees: item.attendees
         ? item.attendees.map((attendee: any) => ({
             email: attendee.email,
-            responseStatus: attendee.responseStatus,
             displayName: attendee.displayName || "No Name",
+            responseStatus: attendee.responseStatus || "needsAction", // Default status
           }))
         : [], // List of attendees
     }));
@@ -254,32 +254,41 @@ const getOutlookCalenderEvents = async (
     let eventsData: Array<any> = [];
 
     if (events.length === 0) {
-      eventsData = [];
-    } else {
-      events.forEach((event: any, index: any) => {
-        let bodytext = htmlToText(event.body.content, {
-          wordwrap: 130,
-          preserveNewlines: true,
-          selectors: [
-            { selector: "div.preview", format: "skip" }, // Skip hidden preview text
-            { selector: "div.footer", format: "skip" }, // Skip footer (unsubscribe, etc.)
-            { selector: "img", format: "skip" }, // Skip tracking pixels
-            { selector: "style", format: "skip" }, // Skip CSS
-            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-          ],
-        }).trim();
-
-        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-        eventsData.push({
-          Subject: event.subject,
-          Start: `${event.start.dateTime} (${event.start.timeZone}`,
-          End: `${event.end.dateTime} (${event.end.timeZone}`,
-          Location: `${event.location.displayName || "N/A"}`,
-          body: bodytext,
-        });
-      });
+      return [];
     }
+
+    events.forEach((event: any) => {
+      let bodytext = htmlToText(event.body.content, {
+        wordwrap: 130,
+        preserveNewlines: true,
+        selectors: [
+          { selector: "div.preview", format: "skip" },
+          { selector: "div.footer", format: "skip" },
+          { selector: "img", format: "skip" },
+          { selector: "style", format: "skip" },
+          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+        ],
+      }).trim();
+
+      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+      // Extract attendees
+      const attendees =
+        event.attendees?.map((attendee: any) => ({
+          email: attendee.emailAddress.address,
+          name: attendee.emailAddress.name || "Unknown",
+          responseStatus: attendee.status.response || "notResponded",
+        })) || [];
+
+      eventsData.push({
+        Subject: event.subject || "No Subject",
+        Start: `${event.start.dateTime} (${event.start.timeZone})`,
+        End: `${event.end.dateTime} (${event.end.timeZone})`,
+        Location: event.location?.displayName || "N/A",
+        body: bodytext,
+        attendees: attendees, // Added attendees
+      });
+    });
 
     return eventsData;
   } catch (err) {

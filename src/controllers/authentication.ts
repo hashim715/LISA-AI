@@ -42,7 +42,7 @@ const integrateOutlookAccount = async (
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    const expiryDate = new Date(Date.now() + expires_in * 1000);
+    const expiryDate = new Date(Date.now() + parseInt(expires_in) * 1000);
 
     const { data } = await axios.get("https://graph.microsoft.com/v1.0/me", {
       headers: { Authorization: `Bearer ${access_token}` },
@@ -173,7 +173,6 @@ export const googleredirectauth: RequestHandler = async (
     const token = req.cookies.authToken;
 
     if (token) {
-      console.log("wait i am integrating gmail account");
       return integrateGmailAccount(res, token, code);
     }
 
@@ -324,7 +323,7 @@ export const outlookredirectauth: RequestHandler = async (
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    const expiryDate = new Date(Date.now() + expires_in * 1000);
+    const expiryDate = new Date(Date.now() + parseInt(expires_in) * 1000);
 
     const { data } = await axios.get("https://graph.microsoft.com/v1.0/me", {
       headers: { Authorization: `Bearer ${access_token}` },

@@ -446,9 +446,9 @@ const getOutlookEmailsFromSpecificSender = async (
   searchName: string
 ): Promise<null | any> => {
   try {
-    const last24Hours = new Date();
-    last24Hours.setDate(last24Hours.getDate() - 1);
-    const last24HoursISO = last24Hours.toISOString();
+    const last24HoursISO = new Date(
+      Date.now() - 24 * 60 * 60 * 1000
+    ).toISOString();
 
     const inboxResponse = await axios.get(
       "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
@@ -462,7 +462,13 @@ const getOutlookEmailsFromSpecificSender = async (
 
     const inboxFolderId = inboxResponse.data.id;
 
-    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and contains(from/emailAddress/name, '${searchName}') and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and (contains(from/emailAddress/address, '${encodeURIComponent(
+      searchName
+    )}') or contains(subject, '${encodeURIComponent(
+      searchName
+    )}') or contains(body/content, '${encodeURIComponent(
+      searchName
+    )}')) and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
 
     const response = await axios.get(apiUrl, {
       headers: {
@@ -496,10 +502,10 @@ const getOutlookEmailsFromSpecificSender = async (
       bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
 
       outlookUnreadEmails.push({
-        From: email.from.emailAddress.name,
-        Subject: email.subject,
-        Body: bodytext,
-        Timestamp: new Date(email.receivedDateTime),
+        from: email.from.emailAddress.name,
+        subject: email.subject,
+        body: bodytext,
+        timestamp: new Date(email.receivedDateTime),
       });
     });
 

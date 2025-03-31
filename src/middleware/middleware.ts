@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../config/postgres";
-import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction, RequestHandler } from "express";
 import dotenv from "dotenv";
 import jwt_decode from "jwt-decode";
 import {
@@ -11,7 +11,7 @@ import {
 
 dotenv.config();
 
-export const protect = async (
+export const protect: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -32,6 +32,7 @@ export const protect = async (
     if (!user) {
       return notFoundResponse(res);
     }
+
     next();
   } catch (err) {
     if (!res.headersSent) {

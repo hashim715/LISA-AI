@@ -20,7 +20,7 @@ import {
 } from "../utils/notionFuncs";
 
 const token =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjA3ZmRmMDVlLWVmYTEtNDU4Zi04YWM5LTEyZTc2YzlmNmJiYiIsImlhdCI6MTc0MzM2MjU0MywiZXhwIjoxNzQ0MjI2NTQzfQ.DkwbpgHELDTIZb5DgDOOqt6kUVK75eWcYl2WWRClzaY";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjA3ZmRmMDVlLWVmYTEtNDU4Zi04YWM5LTEyZTc2YzlmNmJiYiIsImlhdCI6MTc0MzQwMjM0MywiZXhwIjoxNzQ0MjY2MzQzfQ.aGEh-c5vXmJqh55Cznz2EdbcntaPjjxnMbeqV7Mw2mw";
 
 const getGoogleEmails = async (access_token: string): Promise<null | any> => {
   try {

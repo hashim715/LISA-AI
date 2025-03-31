@@ -173,6 +173,7 @@ export const googleredirectauth: RequestHandler = async (
     const token = req.cookies.authToken;
 
     if (token) {
+      console.log("wait i am integrating gmail account");
       return integrateGmailAccount(res, token, code);
     }
 
@@ -305,6 +306,7 @@ export const outlookredirectauth: RequestHandler = async (
     const token = req.cookies.authToken;
 
     if (token) {
+      console.log("wait i am integrating outlook account");
       return integrateOutlookAccount(code, token, res);
     }
 

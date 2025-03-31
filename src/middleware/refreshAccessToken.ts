@@ -74,6 +74,7 @@ export const refreshAccessToken: RequestHandler = async (
 
     const { username }: { username: string } = jwt_decode(token);
     const user = await prisma.user.findFirst({ where: { username: username } });
+
     if (!user) {
       return notFoundResponse(res);
     }
@@ -130,9 +131,9 @@ export const refreshAccessToken: RequestHandler = async (
         await prisma.user.update({
           where: { email: user.email },
           data: {
-            google_access_token: outlook_token_data.access_token,
-            google_refresh_token: outlook_token_data.refresh_token,
-            google_token_expiry: expiryDate.toISOString(),
+            outlook_access_token: outlook_token_data.access_token,
+            outlook_refresh_token: outlook_token_data.refresh_token,
+            outlook_token_expiry: expiryDate.toISOString(),
           },
         });
       }

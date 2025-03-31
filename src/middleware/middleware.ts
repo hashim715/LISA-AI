@@ -16,7 +16,7 @@ export const protect = async (
   res: Response,
   next: NextFunction
 ) => {
-  let token = req.cookies.authToken; // Get token from HTTP-only cookie
+  let token = req.cookies.authToken;
 
   if (!token) {
     return unauthorizedErrorResponse(res);
@@ -24,8 +24,11 @@ export const protect = async (
 
   try {
     const verify = jwt.verify(token, process.env.JWT_SECRET_REFRESH);
+
     const { username }: { username: string } = jwt_decode(token);
+
     const user = await prisma.user.findFirst({ where: { username: username } });
+
     if (!user) {
       return notFoundResponse(res);
     }

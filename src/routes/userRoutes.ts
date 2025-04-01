@@ -7,6 +7,8 @@ import {
   getCalenderEvents,
   notionClientApiTesting,
   getProductHuntPosts,
+  concatenateallApis,
+  perplexityApi,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -28,3 +30,7 @@ userRouter.route("/notionData").get(protect, notionClientApiTesting);
 userRouter
   .route("/getProductHuntPosts/:topic")
   .get(protect, getProductHuntPosts);
+userRouter
+  .route("/getMorningFeedback")
+  .get(protect, refreshAccessToken, concatenateallApis);
+userRouter.route("/perplexityNews").get(protect, perplexityApi);

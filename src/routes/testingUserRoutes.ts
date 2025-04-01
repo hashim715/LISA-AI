@@ -7,6 +7,8 @@ import {
   getCalenderEvents,
   notionClientApiTesting,
   getProductHuntPosts,
+  concatenateallApis,
+  perplexityApi,
 } from "../controllers/testinguser";
 
 export const testingUserRouter: Router = express.Router();
@@ -19,3 +21,5 @@ testingUserRouter
 testingUserRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
 testingUserRouter.route("/notionTesting").get(notionClientApiTesting);
 testingUserRouter.route("/getProductHuntPosts/:topic").get(getProductHuntPosts);
+testingUserRouter.route("/getMorningFeedback").get(concatenateallApis);
+testingUserRouter.route("/perplexityNews").get(perplexityApi);

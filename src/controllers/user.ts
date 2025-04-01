@@ -18,6 +18,7 @@ import {
   summarizeWithLLM,
   summarizeEmailsWithLLM,
 } from "../utils/notionFuncs";
+import { DateTime } from "luxon";
 
 const getGoogleEmails = async (access_token: string): Promise<null | any> => {
   try {
@@ -712,9 +713,12 @@ export const getCurrentDateTime: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const currentDateTime = new Date().toLocaleString();
+    const sanFranciscoTime = DateTime.now().setZone("America/Los_Angeles");
+    const sanFranciscoTimeFormatted = sanFranciscoTime.toFormat(
+      "yyyy-MM-dd HH:mm:ss"
+    );
 
-    return res.status(200).json({ date: currentDateTime });
+    return res.status(200).json({ date: sanFranciscoTimeFormatted });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -790,8 +794,10 @@ export const getProductHuntPosts: RequestHandler = async (
   try {
     const { topic } = req.params;
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    const sanFranciscoTime = DateTime.now().setZone("America/Los_Angeles");
+    const sanFranciscoTimeFormatted = sanFranciscoTime.toFormat(
+      "yyyy-MM-dd HH:mm:ss"
+    );
 
     const response = await fetch("https://api.producthunt.com/v2/api/graphql", {
       method: "POST",
@@ -801,7 +807,7 @@ export const getProductHuntPosts: RequestHandler = async (
       },
       body: JSON.stringify({
         query: `query {
-          posts(first: 10, order: VOTES, topic: "${topic}", postedAfter: "${yesterday}") {
+          posts(first: 10, order: VOTES, topic: "${topic}", postedAfter: "${sanFranciscoTimeFormatted}") {
             edges {
               node {
                 name
@@ -836,6 +842,154 @@ export const getProductHuntPosts: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: formattedProducts });
   } catch (err) {
+    console.log(err.response.data);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const concatenateallApis: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    let google_emails: Array<any> = [];
+    let outlook_emails: Array<any> = [];
+
+    let google_calender_events: Array<any> = [];
+    let outlook_calender_events: Array<any> = [];
+
+    if (user.google_login) {
+      google_emails = await getGoogleEmails(user.google_access_token);
+    }
+
+    if (user.outlook_login) {
+      outlook_emails = await getOutlookEmails(user.outlook_access_token);
+    }
+
+    if (user.google_login) {
+      google_calender_events = await getGoogleCalenderEvents(
+        user.google_access_token
+      );
+    }
+
+    if (user.outlook_login) {
+      outlook_calender_events = await getOutlookCalenderEvents(
+        user.outlook_access_token
+      );
+    }
+
+    let notion_summary = null;
+
+    if (user.notion_login) {
+      const notion = new Client({ auth: user.notion_access_token });
+
+      const searchResponse = await notion.search({
+        filter: {
+          value: "page",
+          property: "object",
+        },
+      });
+
+      let allContent = "";
+
+      for (const item of searchResponse.results as any) {
+        if (item.object === "database") {
+          const databaseContent = await extractDatabaseContent(item.id, notion);
+          allContent += databaseContent + "\n\n";
+        } else if (item.object === "page") {
+          const pageTitle = getPageTitle(item);
+
+          const blocks = await retrieveBlockChildren(item.id, 0, notion);
+          const pageContent = formatPageContent(item, blocks);
+          allContent += pageContent + "\n\n---\n\n";
+        }
+      }
+
+      console.log("\nGenerating summary...");
+      notion_summary = await summarizeWithLLM(allContent);
+      console.log("\nDone generating summary...");
+    }
+
+    return res.status(200).json({
+      success: true,
+      google_emails:
+        google_emails && google_emails.length > 0
+          ? google_emails
+          : "No unread emails in your gmail account",
+      outlook_emails:
+        outlook_emails && outlook_emails.length > 0
+          ? outlook_emails
+          : "No unread emails in your outlook account",
+      google_calender_events:
+        google_calender_events && google_calender_events.length > 0
+          ? google_calender_events
+          : "No events in your google calender",
+      outlook_calender_events:
+        outlook_calender_events && outlook_calender_events.length > 0
+          ? outlook_calender_events
+          : "No events in your outlook calender",
+      notion_summary: notion_summary && notion_summary,
+    });
+  } catch (err) {
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const perplexityApi: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const apiUrl = "https://api.perplexity.ai/chat/completions";
+    const token = process.env.PERPLEXITY_API_KEY;
+
+    const requestData = {
+      model: "sonar",
+      messages: [
+        { role: "system", content: "Be precise and concise." },
+        { role: "user", content: "how is the weather today in san francisco?" },
+      ],
+      max_tokens: 123,
+      temperature: 0.2,
+      top_p: 0.9,
+      return_images: false,
+      return_related_questions: false,
+      search_recency_filter: "day",
+      top_k: 0,
+      stream: false,
+      presence_penalty: 0,
+      frequency_penalty: 1,
+      response_format: { type: "text" },
+      web_search_options: {
+        search_context_size: "high",
+      },
+    };
+
+    const response = await axios.post(apiUrl, requestData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: response.data.choices[0].message.content,
+    });
+  } catch (err) {
+    console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
     }

@@ -711,12 +711,10 @@ export const getCurrentDateTime: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const sanFranciscoTime = DateTime.now().setZone("America/Los_Angeles");
-    const sanFranciscoTimeFormatted = sanFranciscoTime.toFormat(
-      "yyyy-MM-dd HH:mm:ss"
-    );
+    const datetime = new Date();
+    datetime.setUTCHours(datetime.getUTCHours() - 7);
 
-    return res.status(200).json({ date: sanFranciscoTimeFormatted });
+    return res.status(200).json({ date: datetime.toLocaleString() });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -790,10 +788,9 @@ export const getProductHuntPosts: RequestHandler = async (
   try {
     const { topic } = req.params;
 
-    const sanFranciscoTime = DateTime.now().setZone("America/Los_Angeles");
-    const sanFranciscoTimeFormatted = sanFranciscoTime.toFormat(
-      "yyyy-MM-dd HH:mm:ss"
-    );
+    const datetime = new Date();
+    datetime.setUTCDate(datetime.getUTCDate() - 1);
+    datetime.setUTCHours(datetime.getUTCHours() - 7);
 
     const response = await fetch("https://api.producthunt.com/v2/api/graphql", {
       method: "POST",
@@ -803,7 +800,7 @@ export const getProductHuntPosts: RequestHandler = async (
       },
       body: JSON.stringify({
         query: `query {
-          posts(first: 10, order: VOTES, topic: "${topic}", postedAfter: "${sanFranciscoTimeFormatted}") {
+          posts(first: 10, order: VOTES, topic: "${topic}", postedAfter: "${datetime}") {
             edges {
               node {
                 name

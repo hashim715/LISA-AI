@@ -605,6 +605,7 @@ export const slackredirectauth: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: response.data });
   } catch (err) {
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

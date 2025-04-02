@@ -583,7 +583,9 @@ export const slackredirectauth: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { code }: { code: string } = req.body;
+    let { code } = req.query;
+
+    code = code.toString();
 
     if (!code.trim()) {
       return unauthorizedErrorResponse(res);

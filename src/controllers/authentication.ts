@@ -482,7 +482,7 @@ export const notionAuth: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: authUrl });
   } catch (err) {
-    console.log(err.response.data);
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -546,7 +546,65 @@ export const integrateNotionAccount: RequestHandler = async (
       .status(200)
       .json({ success: true, message: "Integrated successfully" });
   } catch (err) {
-    console.log(err.response.data);
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const slackAuth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authUrl =
+      `https://slack.com/oauth/v2/authorize?` +
+      new URLSearchParams({
+        client_id: process.env.SLACK_CLIENT_ID,
+        redirect_uri: process.env.SLACK_REDIRECT_URI,
+        response_type: "code",
+        scope: process.env.SLACK_SCOPES,
+        access_type: "offline",
+      });
+
+    return res.redirect(authUrl);
+  } catch (err) {
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const slackredirectauth: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { code }: { code: string } = req.body;
+
+    if (!code.trim()) {
+      return unauthorizedErrorResponse(res);
+    }
+
+    const response = await axios.post(
+      "https://slack.com/api/oauth.v2.access",
+      null,
+      {
+        params: {
+          client_id: process.env.SLACK_CLIENT_ID,
+          client_secret: process.env.SLACK_CLIENT_SECRET,
+          code,
+          redirect_uri: process.env.SLACK_REDIRECT_URI,
+        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      }
+    );
+
+    return res.status(200).json({ success: true, message: response.data });
+  } catch (err) {
     if (!res.headersSent) {
       return internalServerError(res);
     }

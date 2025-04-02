@@ -18,7 +18,6 @@ import {
   summarizeWithLLM,
   summarizeEmailsWithLLM,
 } from "../utils/notionFuncs";
-import { DateTime } from "luxon";
 
 const getGoogleEmails = async (access_token: string): Promise<null | any> => {
   try {
@@ -839,7 +838,7 @@ export const getProductHuntPosts: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: formattedProducts });
   } catch (err) {
-    console.log(err.response.data);
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -986,7 +985,7 @@ export const perplexityApi: RequestHandler = async (
       message: response.data.choices[0].message.content,
     });
   } catch (err) {
-    console.log(err.response.data);
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

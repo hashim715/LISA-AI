@@ -9,6 +9,7 @@ import {
   getProductHuntPosts,
   concatenateallApis,
   perplexityApi,
+  getUnreadMessages,
 } from "../controllers/testinguser";
 
 export const testingUserRouter: Router = express.Router();
@@ -23,3 +24,4 @@ testingUserRouter.route("/notionTesting").get(notionClientApiTesting);
 testingUserRouter.route("/getProductHuntPosts/:topic").get(getProductHuntPosts);
 testingUserRouter.route("/getMorningFeedback").get(concatenateallApis);
 testingUserRouter.route("/perplexityNews").get(perplexityApi);
+testingUserRouter.route("/getUnreadMessages").get(getUnreadMessages);

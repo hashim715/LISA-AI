@@ -34,6 +34,9 @@ model User {
   notion_login Boolean @default(false)
   notion_access_token String?
   slack_login Boolean @default(false)
-  slack_access_token String?
+  slack_bot_access_token String?
+  slack_user_access_token String?
+  slack_user_id String?
+  slack_bot_id String?
   expiresAt String?
 }

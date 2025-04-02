@@ -10,6 +10,7 @@ import {
   concatenateallApis,
   perplexityApi,
   getUnreadMessages,
+  sendMessage,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -36,3 +37,4 @@ userRouter
   .get(protect, refreshAccessToken, concatenateallApis);
 userRouter.route("/perplexityNews").get(protect, perplexityApi);
 userRouter.route("/getUnreadMessages").get(protect, getUnreadMessages);
+userRouter.route("/sendMessage").get(protect, sendMessage);

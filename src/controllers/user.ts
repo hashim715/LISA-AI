@@ -583,11 +583,10 @@ const getUnreadMessagesFunc = async (
     );
 
     const messages = response.data.messages;
+
     const unreadMessages = messages.filter(
       (msg: any) => parseFloat(msg.ts) > parseFloat(lastReadTimestamp)
     );
-
-    console.log(`Unread messages: ${unreadMessages.length}`);
 
     return unreadMessages;
   } catch (err) {
@@ -619,6 +618,77 @@ const getLastReadTimestamp = async (
     return null;
   } catch (err) {
     console.log(err.response.data);
+    return null;
+  }
+};
+
+const getUsername = async (slack_access_token: string, userID: string) => {
+  try {
+    const response = await axios.get("https://slack.com/api/users.info", {
+      headers: { Authorization: `Bearer ${slack_access_token}` },
+      params: { user: userID },
+    });
+
+    if (response.data.ok) {
+      return response.data.user.real_name || response.data.user.name;
+    }
+
+    return null;
+  } catch (err) {
+    console.log(err.response.data);
+    return null;
+  }
+};
+
+const formatUnreadMessages = async (
+  unreadMessages: Array<any>,
+  slack_access_token: string,
+  userID: string
+) => {
+  try {
+    const formatedMessages: Array<any> = [];
+
+    for (const message of unreadMessages) {
+      const sender = message.user
+        ? await getUsername(slack_access_token, userID)
+        : "Unknown";
+
+      formatedMessages.push({
+        sender,
+        text: message.text || "(No text content)",
+        timestamp: new Date(parseFloat(message.ts) * 1000).toISOString(),
+      });
+    }
+
+    return formatedMessages;
+  } catch (err) {
+    return null;
+  }
+};
+
+const sendMessageAsUser = async (
+  slack_access_token: string,
+  text: string,
+  channelId: string
+) => {
+  try {
+    const response = await axios.post(
+      "https://slack.com/api/chat.postMessage",
+      {
+        channel: channelId,
+        text: text,
+        as_user: true,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${slack_access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (err) {
     return null;
   }
 };
@@ -1090,36 +1160,83 @@ export const getUnreadMessages: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    const conversations = await getConversations(user.slack_access_token);
+    const conversations = await getConversations(user.slack_user_access_token);
 
-    if (!conversations || conversations.channels.length == 0) {
+    if (!conversations) {
       return badRequestResponse(res, "No any conversations found");
     }
 
-    let last_read_timestamp = null;
+    const all_unread_messages: Array<any> = [];
 
-    const user_id = "U08L8A9R935";
+    for (const channel of conversations.channels) {
+      const last_read_timestamp = await getLastReadTimestamp(
+        channel.id,
+        user.slack_user_access_token
+      );
 
-    last_read_timestamp = await getLastReadTimestamp(
-      conversations.channels[0].id,
-      user.slack_access_token
-    );
+      if (last_read_timestamp) {
+        const unread_messages = await getUnreadMessagesFunc(
+          channel.id,
+          last_read_timestamp,
+          user.slack_user_access_token
+        );
 
-    if (!last_read_timestamp) {
-      return badRequestResponse(res, "No any unread messages found");
+        if (!unread_messages) {
+          continue;
+        }
+
+        const formattedMessages = await formatUnreadMessages(
+          unread_messages,
+          user.slack_user_access_token,
+          user.slack_user_id
+        );
+
+        all_unread_messages.push({
+          channel_id: channel.id,
+          channel_name: channel.name,
+          unread_messages: formattedMessages,
+        });
+      }
     }
 
-    const unread_messages = await getUnreadMessagesFunc(
-      conversations.channels[0].id,
-      last_read_timestamp,
-      user.slack_access_token
+    return res
+      .status(200)
+      .json({ success: true, message: all_unread_messages });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const sendMessage: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const text = "first message";
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const channelID = "C08KQQTSMKR";
+
+    const data = await sendMessageAsUser(
+      user.slack_user_access_token,
+      text,
+      channelID
     );
 
-    if (!unread_messages) {
-      return badRequestResponse(res, "No any unread messages found");
+    if (!data) {
+      return badRequestResponse(res, "Message not sent");
     }
 
-    return res.status(200).json({ success: true, message: unread_messages });
+    return res.status(200).json({ success: true, message: "Message sent" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

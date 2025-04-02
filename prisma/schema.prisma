@@ -33,5 +33,7 @@ model User {
   outlook_token_expiry String?
   notion_login Boolean @default(false)
   notion_access_token String?
+  slack_login Boolean @default(false)
+  slack_access_token String?
   expiresAt String?
 }

@@ -9,6 +9,7 @@ import {
   getProductHuntPosts,
   concatenateallApis,
   perplexityApi,
+  getUnreadMessages,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -34,3 +35,4 @@ userRouter
   .route("/getMorningFeedback")
   .get(protect, refreshAccessToken, concatenateallApis);
 userRouter.route("/perplexityNews").get(protect, perplexityApi);
+userRouter.route("/getUnreadMessages").get(protect, getUnreadMessages);

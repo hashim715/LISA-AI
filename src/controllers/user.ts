@@ -537,6 +537,92 @@ const getOutlookEmailsFromSpecificSender = async (
   }
 };
 
+const getConversations = async (slack_access_token: string) => {
+  try {
+    const response = await axios.get(
+      "https://slack.com/api/conversations.list",
+      {
+        headers: {
+          Authorization: `Bearer ${slack_access_token}`,
+          "Content-Type": "application/json",
+        },
+        params: {
+          types: "public_channel,private_channel",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (err) {
+    console.log(err.response.data);
+    return null;
+  }
+};
+
+const getUnreadMessagesFunc = async (
+  channelId: string,
+  lastReadTimestamp: string,
+  slack_access_token: string
+) => {
+  try {
+    const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+
+    const response = await axios.get(
+      "https://slack.com/api/conversations.history",
+      {
+        headers: {
+          Authorization: `Bearer ${slack_access_token}`,
+          "Content-Type": "application/json",
+        },
+        params: {
+          channel: channelId,
+          limit: 100,
+          oldest: oneDayAgo.toString(),
+        },
+      }
+    );
+
+    const messages = response.data.messages;
+    const unreadMessages = messages.filter(
+      (msg: any) => parseFloat(msg.ts) > parseFloat(lastReadTimestamp)
+    );
+
+    console.log(`Unread messages: ${unreadMessages.length}`);
+
+    return unreadMessages;
+  } catch (err) {
+    console.log(err.response.data);
+    return null;
+  }
+};
+
+const getLastReadTimestamp = async (
+  channelId: string,
+  slack_access_token: string
+) => {
+  try {
+    const response = await axios.get(
+      "https://slack.com/api/conversations.info",
+      {
+        headers: {
+          Authorization: `Bearer ${slack_access_token}`,
+          "Content-Type": "application/json",
+        },
+        params: { channel: channelId },
+      }
+    );
+
+    if (response.data.ok) {
+      return response.data.channel.last_read;
+    }
+
+    return null;
+  } catch (err) {
+    console.log(err.response.data);
+    return null;
+  }
+};
+
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
   res: Response,
@@ -984,6 +1070,56 @@ export const perplexityApi: RequestHandler = async (
       success: true,
       message: response.data.choices[0].message.content,
     });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const getUnreadMessages: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const conversations = await getConversations(user.slack_access_token);
+
+    if (!conversations || conversations.channels.length == 0) {
+      return badRequestResponse(res, "No any conversations found");
+    }
+
+    let last_read_timestamp = null;
+
+    const user_id = "U08L8A9R935";
+
+    last_read_timestamp = await getLastReadTimestamp(
+      conversations.channels[0].id,
+      user.slack_access_token
+    );
+
+    if (!last_read_timestamp) {
+      return badRequestResponse(res, "No any unread messages found");
+    }
+
+    const unread_messages = await getUnreadMessagesFunc(
+      conversations.channels[0].id,
+      last_read_timestamp,
+      user.slack_access_token
+    );
+
+    if (!unread_messages) {
+      return badRequestResponse(res, "No any unread messages found");
+    }
+
+    return res.status(200).json({ success: true, message: unread_messages });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

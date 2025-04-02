@@ -565,8 +565,8 @@ export const slackAuth: RequestHandler = async (
         client_id: process.env.SLACK_CLIENT_ID,
         redirect_uri: process.env.SLACK_REDIRECT_URI,
         response_type: "code",
-        scope: process.env.SLACK_SCOPES,
-        access_type: "offline",
+        scope: process.env.SLACK_SCOPES, // Bot token scopes
+        user_scope: process.env.SLACK_USER_SCOPES, // User token scopes
       });
 
     return res.redirect(authUrl);

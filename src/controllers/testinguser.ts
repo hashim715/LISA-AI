@@ -569,6 +569,8 @@ export const sendMessage: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
+    console.log(text);
+
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
@@ -585,6 +587,8 @@ export const sendMessage: RequestHandler = async (
       channelMap.set(channel.name, channel.id);
     }
 
+    console.log(channelMap);
+
     const processedInput = await processUserInput(text);
 
     if (!processedInput) {
@@ -598,7 +602,11 @@ export const sendMessage: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid input");
     }
 
+    console.log(channel, message);
+
     const channelID = channelMap.get(channel.toLowerCase());
+
+    console.log(channelID);
 
     const data = await sendMessageAsUser(
       user.slack_user_access_token,

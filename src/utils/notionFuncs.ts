@@ -1,11 +1,5 @@
 import { iteratePaginatedAPI, Client } from "@notionhq/client";
-import OpenAI from "openai";
-import dotenv from "dotenv";
 import { BlockObjectResponse } from "@notionhq/client/build/src/api-endpoints";
-
-dotenv.config();
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const getPlainTextFromRichText = (richText: any) => {
   return richText.map((t: any) => t.plain_text).join("");
@@ -123,7 +117,6 @@ export async function extractDatabaseContent(databaseId: any, notion: any) {
   return content;
 }
 
-// New function to get page title
 export function getPageTitle(page: any) {
   if (page.properties?.title?.title) {
     return getPlainTextFromRichText(page.properties.title.title);
@@ -134,7 +127,6 @@ export function getPageTitle(page: any) {
   }
 }
 
-// Enhanced function to handle nested blocks
 export const retrieveBlockChildren = async (
   id: string,
   level: number = 0,
@@ -167,7 +159,6 @@ export const retrieveBlockChildren = async (
   return blocks;
 };
 
-// Use the source URL and optional caption from media blocks (file, video, etc.)
 const getMediaSourceText = (block: any) => {
   let source, caption;
 
@@ -189,7 +180,6 @@ const getMediaSourceText = (block: any) => {
   return source;
 };
 
-// Get the plain text from any block type supported by the public API.
 const getTextFromBlock = (block: any) => {
   let text;
 
@@ -269,7 +259,6 @@ const getTextFromBlock = (block: any) => {
   return block.type + ": " + text;
 };
 
-// Enhanced function to format block content
 function formatBlockContent(block: any, level = 0) {
   let content = "";
   const indent = " ".repeat(level * 2);
@@ -288,7 +277,6 @@ function formatBlockContent(block: any, level = 0) {
   return content;
 }
 
-// Enhanced function to format page content for LLM
 export const formatPageContent = (page: any, blocks: any) => {
   const pageTitle = getPageTitle(page);
   let content = `Page: ${pageTitle}\nURL: ${page.url}\n\n`;
@@ -358,53 +346,4 @@ export const formatPageContent = (page: any, blocks: any) => {
   }
 
   return content;
-};
-
-// New function to summarize content with LLM
-export const summarizeWithLLM = async (allContent: any) => {
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful assistant that analyzes Notion page content and provides clear summaries. Focus on key information, main topics, and important points from each page.",
-        },
-        {
-          role: "user",
-          content: `Please provide a summary of these Notion pages:\n\n${allContent}`,
-        },
-      ],
-      model: "gpt-3.5-turbo",
-    });
-
-    return completion.choices[0].message.content;
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
-};
-
-export const summarizeEmailsWithLLM = async (email: string) => {
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful assistant that analyzes email body and provides clear summaries. Focus on key information, main topics, and important points from each email.",
-        },
-        {
-          role: "user",
-          content: `Please provide a summary of this email:\n\n${email}`,
-        },
-      ],
-      model: "gpt-3.5-turbo",
-    });
-
-    return completion.choices[0].message.content;
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
 };

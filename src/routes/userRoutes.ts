@@ -5,7 +5,7 @@ import {
   getCurrentDateTime,
   getEmailsUsingSearchQuery,
   getCalenderEvents,
-  notionClientApiTesting,
+  notionDataApi,
   getProductHuntPosts,
   concatenateallApis,
   perplexityApi,
@@ -28,7 +28,7 @@ userRouter
   .route("/getEmailsUsingSearchQuery/:searchField")
   .get(protect, refreshAccessToken, getEmailsUsingSearchQuery);
 userRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
-userRouter.route("/notionData").get(protect, notionClientApiTesting);
+userRouter.route("/notionData").get(protect, notionDataApi);
 userRouter
   .route("/getProductHuntPosts/:topic")
   .get(protect, getProductHuntPosts);

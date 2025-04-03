@@ -31,7 +31,7 @@ app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.use(timeout("40s"));
+app.use(timeout("10s"));
 
 // rate limiter
 // app.use(limiter);
@@ -51,7 +51,6 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     .json({ success: false, message: "Something went wrong try again.." });
 });
 
-// app.use("/api/user", userRouter);
 app.use("/v1/testing", testingRouter);
 app.use("/v1/auth", authRouter);
 app.use("/v1/user", userRouter);

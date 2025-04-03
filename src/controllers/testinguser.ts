@@ -1,9 +1,7 @@
 import { prisma } from "../config/postgres";
 import { Request, Response, NextFunction, RequestHandler } from "express";
-import { htmlToText } from "html-to-text";
 import axios from "axios";
 import jwt_decode from "jwt-decode";
-import { decodeBase64Url } from "../utils/decodeBase64Url";
 import {
   internalServerError,
   badRequestResponse,
@@ -15,686 +13,32 @@ import {
   getPageTitle,
   retrieveBlockChildren,
   formatPageContent,
-  summarizeWithLLM,
-  summarizeEmailsWithLLM,
 } from "../utils/notionFuncs";
+import {
+  processUserInput,
+  summarizeNotionWithLLM,
+} from "../utils/chatgptFuncs";
+import {
+  getConversations,
+  sendMessageAsUser,
+  getUnreadMessagesFunc,
+  getLastReadTimestamp,
+  formatUnreadMessages,
+  getUsername,
+} from "../utils/slackApi";
+import {
+  getGoogleEmails,
+  getGoogleCalenderEvents,
+  getGoogleEmailsFromSpecificSender,
+} from "../utils/gmailApi";
+import {
+  getOutlookEmails,
+  getOutlookCalenderEvents,
+  getOutlookEmailsFromSpecificSender,
+} from "../utils/outlookApi";
 
 const token =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjA3ZmRmMDVlLWVmYTEtNDU4Zi04YWM5LTEyZTc2YzlmNmJiYiIsImlhdCI6MTc0MzQwMjM0MywiZXhwIjoxNzQ0MjY2MzQzfQ.aGEh-c5vXmJqh55Cznz2EdbcntaPjjxnMbeqV7Mw2mw";
-
-const getGoogleEmails = async (access_token: string): Promise<null | any> => {
-  try {
-    const last24Hours = new Date();
-    last24Hours.setDate(last24Hours.getDate() - 1);
-
-    const listResponse = await axios.get(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: { q: "is:unread category:primary", maxResults: 10 },
-      }
-    );
-
-    const messages = listResponse.data.messages || [];
-
-    const unreadEmails = await Promise.all(
-      messages.map(async (message: any) => {
-        const msgResponse = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" },
-          }
-        );
-
-        const { payload, internalDate } = msgResponse.data;
-        const headers = payload.headers || [];
-
-        const subjectHeader = headers.find((h: any) => h.name === "Subject");
-        const fromHeader = headers.find((h: any) => h.name === "From");
-
-        const subject = subjectHeader ? subjectHeader.value : "No Subject";
-        const from = fromHeader ? fromHeader.value : "Unknown Sender";
-
-        let body = "";
-        if (payload.parts) {
-          const textPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/plain"
-          );
-          const htmlPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/html"
-          );
-          body =
-            textPart && textPart.body.data
-              ? decodeBase64Url(textPart.body.data)
-              : htmlPart && htmlPart.body.data
-              ? decodeBase64Url(htmlPart.body.data)
-              : "No readable content";
-        } else if (payload.body && payload.body.data) {
-          body = decodeBase64Url(payload.body.data);
-        }
-
-        let bodytext = htmlToText(body, {
-          wordwrap: 130,
-          preserveNewlines: true,
-          selectors: [
-            { selector: "div.preview", format: "skip" },
-            { selector: "div.footer", format: "skip" },
-            { selector: "img", format: "skip" },
-            { selector: "style", format: "skip" },
-            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-          ],
-        }).trim();
-
-        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-        return {
-          body: bodytext,
-          subject: subject,
-          timestamp: new Date(Number(internalDate)),
-          from: from,
-        };
-      })
-    );
-
-    const filteredUnreadEmails = unreadEmails.filter(
-      (email: any) => email.timestamp >= last24Hours
-    );
-
-    const summarizedEmails: Array<any> = [];
-
-    for (const email of filteredUnreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
-
-    return summarizedEmails;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getOutlookEmails = async (access_token: string): Promise<null | any> => {
-  try {
-    const last24Hours = new Date();
-    last24Hours.setDate(last24Hours.getDate() - 1);
-    const last24HoursISO = last24Hours.toISOString();
-
-    const inboxResponse = await axios.get(
-      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const inboxFolderId = inboxResponse.data.id;
-
-    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and isRead eq false and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
-
-    const response = await axios.get(apiUrl, {
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    let outlookunReamdEmails: Array<any> = [];
-
-    const outlookemails = response.data.value;
-    if (outlookemails.length === 0) {
-      outlookunReamdEmails = [];
-    } else {
-      outlookemails.forEach((email: any, index: number) => {
-        let body: string = email.body.content;
-
-        let bodytext = htmlToText(body, {
-          wordwrap: 130,
-          preserveNewlines: true,
-          selectors: [
-            { selector: "div.preview", format: "skip" },
-            { selector: "div.footer", format: "skip" },
-            { selector: "img", format: "skip" },
-            { selector: "style", format: "skip" },
-            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-          ],
-        }).trim();
-
-        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-        outlookunReamdEmails.push({
-          from: email.from.emailAddress.address,
-          subject: email.subject,
-          timestamp: new Date(email.receivedDateTime),
-          body: bodytext,
-        });
-      });
-    }
-
-    const summarizedEmails: Array<any> = [];
-
-    for (const email of outlookunReamdEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
-
-    return summarizedEmails;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getGoogleCalenderEvents = async (
-  access_token: string
-): Promise<null | any> => {
-  try {
-    const now = new Date();
-    const sevenDaysLater = new Date();
-    sevenDaysLater.setDate(now.getDate() + 7);
-
-    const timeMin = now.toISOString();
-    const timeMax = sevenDaysLater.toISOString();
-
-    const response = await axios.get(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
-        timeMin
-      )}&timeMax=${encodeURIComponent(
-        timeMax
-      )}&orderBy=startTime&singleEvents=true&maxAttendees=100`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
-    );
-
-    const eventsData: Array<any> = response.data.items.map((item: any) => ({
-      title: item.summary || "No Title", // Event title
-      description: item.description || "No Description", // Event description
-      location: item.location || "No Location", // Event location
-      start: item.start.dateTime || item.start.date, // Start time
-      end: item.end.dateTime || item.end.date, // End time
-      attendees: item.attendees
-        ? item.attendees.map((attendee: any) => ({
-            email: attendee.email,
-            responseStatus: attendee.responseStatus || "needsAction",
-          }))
-        : [],
-    }));
-
-    return eventsData;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getOutlookCalenderEvents = async (
-  access_token: string
-): Promise<null | any> => {
-  try {
-    const now = new Date();
-    const startTime = now.toISOString();
-
-    const sevenDaysLater = new Date();
-    sevenDaysLater.setDate(now.getDate() + 7);
-    const endTime = sevenDaysLater.toISOString();
-
-    // Microsoft Graph API URL for fetching events
-    const apiUrl = `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=start/dateTime ge '${startTime}' and start/dateTime le '${endTime}'&$orderby=start/dateTime&$select=subject,start,end,location,body,attendees`;
-
-    const response = await axios.get(apiUrl, {
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const events = response.data.value;
-
-    let eventsData: Array<any> = [];
-
-    if (events.length === 0) {
-      return [];
-    }
-
-    events.forEach((event: any) => {
-      let bodytext = htmlToText(event.body.content, {
-        wordwrap: 130,
-        preserveNewlines: true,
-        selectors: [
-          { selector: "div.preview", format: "skip" },
-          { selector: "div.footer", format: "skip" },
-          { selector: "img", format: "skip" },
-          { selector: "style", format: "skip" },
-          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-        ],
-      }).trim();
-
-      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-      const attendees =
-        event.attendees?.map((attendee: any) => ({
-          email: attendee.emailAddress.address,
-          responseStatus: attendee.status.response || "notResponded",
-        })) || [];
-
-      eventsData.push({
-        title: event.subject || "No Subject",
-        Start: `${event.start.dateTime} (${event.start.timeZone})`,
-        End: `${event.end.dateTime} (${event.end.timeZone})`,
-        Location: event.location?.displayName || "N/A",
-        description: bodytext,
-        attendees: attendees,
-      });
-    });
-
-    return eventsData;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getGoogleEmailsFromSpecificSender = async (
-  access_token: string,
-  searchQuery: string
-): Promise<null | any> => {
-  try {
-    const last24Hours = new Date();
-    last24Hours.setDate(last24Hours.getDate() - 1);
-
-    const listResponse = await axios.get(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: {
-          q: `"${searchQuery}" category:primary`,
-          maxResults: 10,
-        },
-      }
-    );
-
-    const messages = listResponse.data.messages || [];
-
-    const unreadEmails = await Promise.all(
-      messages.map(async (message: any) => {
-        const msgResponse = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" },
-          }
-        );
-
-        const { payload, snippet, internalDate } = msgResponse.data;
-        const headers = payload.headers || [];
-
-        const subjectHeader = headers.find((h: any) => h.name === "Subject");
-        const fromHeader = headers.find((h: any) => h.name === "From");
-
-        const subject = subjectHeader ? subjectHeader.value : "No Subject";
-        const from = fromHeader ? fromHeader.value : "Unknown Sender";
-
-        let body = "";
-        if (payload.parts) {
-          const textPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/plain"
-          );
-          const htmlPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/html"
-          );
-          body =
-            textPart && textPart.body.data
-              ? decodeBase64Url(textPart.body.data)
-              : htmlPart && htmlPart.body.data
-              ? decodeBase64Url(htmlPart.body.data)
-              : "No readable content";
-        } else if (payload.body && payload.body.data) {
-          body = decodeBase64Url(payload.body.data);
-        }
-
-        let bodytext = htmlToText(body, {
-          wordwrap: 130,
-          preserveNewlines: true,
-          selectors: [
-            { selector: "div.preview", format: "skip" },
-            { selector: "div.footer", format: "skip" },
-            { selector: "img", format: "skip" },
-            { selector: "style", format: "skip" },
-            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-          ],
-        }).trim();
-
-        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-        return {
-          body: bodytext,
-          timestamp: new Date(Number(internalDate)),
-          subject: subject,
-          from: from,
-        };
-      })
-    );
-
-    const filteredUnreadEmails = unreadEmails.filter(
-      (email: any) =>
-        email.timestamp >= last24Hours &&
-        email.from.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const summarizedEmails: Array<any> = [];
-
-    for (const email of filteredUnreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
-
-    return summarizedEmails;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getOutlookEmailsFromSpecificSender = async (
-  access_token: string,
-  searchName: string
-): Promise<null | any> => {
-  try {
-    const last24HoursISO = new Date(
-      Date.now() - 24 * 60 * 60 * 1000
-    ).toISOString();
-
-    const inboxResponse = await axios.get(
-      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const inboxFolderId = inboxResponse.data.id;
-
-    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and (contains(from/emailAddress/address, '${encodeURIComponent(
-      searchName
-    )}') or contains(subject, '${encodeURIComponent(
-      searchName
-    )}') or contains(body/content, '${encodeURIComponent(
-      searchName
-    )}')) and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
-
-    const response = await axios.get(apiUrl, {
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    let outlookUnreadEmails: Array<any> = [];
-
-    const outlookemails = response.data.value;
-
-    if (outlookemails.length === 0) {
-      return [];
-    }
-
-    outlookemails.forEach((email: any) => {
-      let body: string = email.body.content;
-
-      let bodytext = htmlToText(body, {
-        wordwrap: 130,
-        preserveNewlines: true,
-        selectors: [
-          { selector: "div.preview", format: "skip" },
-          { selector: "div.footer", format: "skip" },
-          { selector: "img", format: "skip" },
-          { selector: "style", format: "skip" },
-          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-        ],
-      }).trim();
-
-      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-      outlookUnreadEmails.push({
-        from: email.from.emailAddress.name,
-        subject: email.subject,
-        body: bodytext,
-        timestamp: new Date(email.receivedDateTime),
-      });
-    });
-
-    const summarizedEmails: Array<any> = [];
-
-    for (const email of outlookUnreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
-
-    return summarizedEmails;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getConversations = async (slack_access_token: string) => {
-  try {
-    const response = await axios.get(
-      "https://slack.com/api/conversations.list",
-      {
-        headers: {
-          Authorization: `Bearer ${slack_access_token}`,
-          "Content-Type": "application/json",
-        },
-        params: {
-          types: "public_channel,private_channel",
-        },
-      }
-    );
-
-    return response.data;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getUnreadMessagesFunc = async (
-  channelId: string,
-  lastReadTimestamp: string,
-  slack_access_token: string
-) => {
-  try {
-    const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
-
-    const response = await axios.get(
-      "https://slack.com/api/conversations.history",
-      {
-        headers: {
-          Authorization: `Bearer ${slack_access_token}`,
-          "Content-Type": "application/json",
-        },
-        params: {
-          channel: channelId,
-          limit: 100,
-          oldest: oneDayAgo.toString(),
-        },
-      }
-    );
-
-    const messages = response.data.messages;
-
-    const unreadMessages = messages.filter(
-      (msg: any) => parseFloat(msg.ts) > parseFloat(lastReadTimestamp)
-    );
-
-    return unreadMessages;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getLastReadTimestamp = async (
-  channelId: string,
-  slack_access_token: string
-) => {
-  try {
-    const response = await axios.get(
-      "https://slack.com/api/conversations.info",
-      {
-        headers: {
-          Authorization: `Bearer ${slack_access_token}`,
-          "Content-Type": "application/json",
-        },
-        params: { channel: channelId },
-      }
-    );
-
-    if (response.data.ok) {
-      return response.data.channel.last_read;
-    }
-
-    return null;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const getUsername = async (slack_access_token: string, userID: string) => {
-  try {
-    const response = await axios.get("https://slack.com/api/users.info", {
-      headers: { Authorization: `Bearer ${slack_access_token}` },
-      params: { user: userID },
-    });
-
-    if (response.data.ok) {
-      return response.data.user.real_name || response.data.user.name;
-    }
-
-    return null;
-  } catch (err) {
-    console.log(err.response.data);
-    return null;
-  }
-};
-
-const formatUnreadMessages = async (
-  unreadMessages: Array<any>,
-  slack_access_token: string
-) => {
-  try {
-    const formatedMessages: Array<any> = [];
-
-    for (const message of unreadMessages) {
-      const sender = message.user
-        ? await getUsername(slack_access_token, message.user)
-        : "Unknown";
-
-      formatedMessages.push({
-        sender,
-        text: message.text || "(No text content)",
-        timestamp: new Date(parseFloat(message.ts) * 1000).toISOString(),
-      });
-    }
-
-    return formatedMessages;
-  } catch (err) {
-    return null;
-  }
-};
-
-const sendMessageAsUser = async (
-  slack_access_token: string,
-  text: string,
-  channelId: string
-) => {
-  try {
-    const response = await axios.post(
-      "https://slack.com/api/chat.postMessage",
-      {
-        channel: channelId,
-        text: text,
-        as_user: true,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${slack_access_token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return response.data;
-  } catch (err) {
-    return null;
-  }
-};
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -920,7 +264,7 @@ export const notionClientApiTesting: RequestHandler = async (
     }
 
     console.log("\nGenerating summary...");
-    const summary = await summarizeWithLLM(allContent);
+    const summary = await summarizeNotionWithLLM(allContent);
     if (!summary) {
       return badRequestResponse(res, "Try again something went wrong");
     }
@@ -1060,7 +404,7 @@ export const concatenateallApis: RequestHandler = async (
       }
 
       console.log("\nGenerating summary...");
-      notion_summary = await summarizeWithLLM(allContent);
+      notion_summary = await summarizeNotionWithLLM(allContent);
       console.log("\nDone generating summary...");
     }
 
@@ -1160,6 +504,14 @@ export const getUnreadMessages: RequestHandler = async (
     const all_unread_messages: Array<any> = [];
 
     for (const channel of conversations.channels) {
+      const isDM = channel.is_im;
+      const conversationName = isDM
+        ? `DM with ${await getUsername(
+            user.slack_user_access_token,
+            channel.user
+          )}`
+        : channel.name;
+
       const last_read_timestamp = await getLastReadTimestamp(
         channel.id,
         user.slack_user_access_token
@@ -1176,18 +528,21 @@ export const getUnreadMessages: RequestHandler = async (
           continue;
         }
 
-        if (unread_messages.length > 0) {
-          const formattedMessages = await formatUnreadMessages(
-            unread_messages,
-            user.slack_user_access_token
-          );
+        const formattedMessages = await formatUnreadMessages(
+          unread_messages,
+          user.slack_user_access_token
+        );
 
-          all_unread_messages.push({
-            channel_id: channel.id,
-            channel_name: channel.name,
-            unread_messages: formattedMessages,
-          });
-        }
+        all_unread_messages.push({
+          channel_id: channel.id,
+          channel_name: channel.name,
+          unread_messages: formattedMessages,
+          type: isDM
+            ? "direct_message"
+            : channel.is_private
+            ? "private_channel"
+            : "public_channel",
+        });
       }
     }
 
@@ -1208,13 +563,39 @@ export const sendMessage: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const text = "first message";
+    const text =
+      "send a message to shahbaz on channel general that i want to discuss about lisa project something important";
 
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    const channelID = "C08KQQTSMKR";
+    const conversations = await getConversations(user.slack_user_access_token);
+
+    const channelMap = new Map();
+
+    if (!conversations) {
+      return badRequestResponse(res, "No any conversations found");
+    }
+
+    for (const channel of conversations.channels) {
+      channelMap.set(channel.name, channel.id);
+    }
+
+    const processedInput = await processUserInput(text);
+
+    if (!processedInput) {
+      return badRequestResponse(res, "Please provide valid input");
+    }
+
+    const { channel, message }: { channel: string; message: string } =
+      JSON.parse(processedInput);
+
+    if (!channel || !message) {
+      return badRequestResponse(res, "Please provide valid input");
+    }
+
+    const channelID = channelMap.get(channel.toLowerCase());
 
     const data = await sendMessageAsUser(
       user.slack_user_access_token,

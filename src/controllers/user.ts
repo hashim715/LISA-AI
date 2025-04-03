@@ -610,7 +610,7 @@ export const sendMessage: RequestHandler = async (
 
     const data = await sendMessageAsUser(
       user.slack_user_access_token,
-      text,
+      message,
       channelID
     );
 

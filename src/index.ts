@@ -31,7 +31,7 @@ app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.use(timeout("10s"));
+app.use(timeout("90s"));
 
 // rate limiter
 // app.use(limiter);

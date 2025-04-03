@@ -563,8 +563,7 @@ export const sendMessage: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const text =
-      "send a message to shahbaz on channel general that i want to discuss about lisa project something important";
+    const { text } = req.params;
 
     const { username }: { username: string } = jwt_decode(token);
 
@@ -599,7 +598,7 @@ export const sendMessage: RequestHandler = async (
 
     const data = await sendMessageAsUser(
       user.slack_user_access_token,
-      text,
+      message,
       channelID
     );
 

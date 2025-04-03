@@ -646,15 +646,14 @@ const getUsername = async (slack_access_token: string, userID: string) => {
 
 const formatUnreadMessages = async (
   unreadMessages: Array<any>,
-  slack_access_token: string,
-  userID: string
+  slack_access_token: string
 ) => {
   try {
     const formatedMessages: Array<any> = [];
 
     for (const message of unreadMessages) {
       const sender = message.user
-        ? await getUsername(slack_access_token, userID)
+        ? await getUsername(slack_access_token, message.user)
         : "Unknown";
 
       formatedMessages.push({
@@ -665,6 +664,33 @@ const formatUnreadMessages = async (
     }
 
     return formatedMessages;
+  } catch (err) {
+    return null;
+  }
+};
+
+const sendMessageAsUser = async (
+  slack_access_token: string,
+  text: string,
+  channelId: string
+) => {
+  try {
+    const response = await axios.post(
+      "https://slack.com/api/chat.postMessage",
+      {
+        channel: channelId,
+        text: text,
+        as_user: true,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${slack_access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
   } catch (err) {
     return null;
   }
@@ -1127,7 +1153,7 @@ export const getUnreadMessages: RequestHandler = async (
 
     const conversations = await getConversations(user.slack_user_access_token);
 
-    if (!conversations || conversations.channels.length == 0) {
+    if (!conversations) {
       return badRequestResponse(res, "No any conversations found");
     }
 
@@ -1153,8 +1179,7 @@ export const getUnreadMessages: RequestHandler = async (
         if (unread_messages.length > 0) {
           const formattedMessages = await formatUnreadMessages(
             unread_messages,
-            user.slack_user_access_token,
-            user.slack_user_id
+            user.slack_user_access_token
           );
 
           all_unread_messages.push({
@@ -1169,6 +1194,39 @@ export const getUnreadMessages: RequestHandler = async (
     return res
       .status(200)
       .json({ success: true, message: all_unread_messages });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const sendMessage: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const text = "first message";
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const channelID = "C08KQQTSMKR";
+
+    const data = await sendMessageAsUser(
+      user.slack_user_access_token,
+      text,
+      channelID
+    );
+
+    if (!data) {
+      return badRequestResponse(res, "Message not sent");
+    }
+
+    return res.status(200).json({ success: true, message: "Message sent" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

@@ -642,15 +642,14 @@ const getUsername = async (slack_access_token: string, userID: string) => {
 
 const formatUnreadMessages = async (
   unreadMessages: Array<any>,
-  slack_access_token: string,
-  userID: string
+  slack_access_token: string
 ) => {
   try {
     const formatedMessages: Array<any> = [];
 
     for (const message of unreadMessages) {
       const sender = message.user
-        ? await getUsername(slack_access_token, userID)
+        ? await getUsername(slack_access_token, message.user)
         : "Unknown";
 
       formatedMessages.push({
@@ -1187,8 +1186,7 @@ export const getUnreadMessages: RequestHandler = async (
 
         const formattedMessages = await formatUnreadMessages(
           unread_messages,
-          user.slack_user_access_token,
-          user.slack_user_id
+          user.slack_user_access_token
         );
 
         all_unread_messages.push({

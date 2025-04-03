@@ -26,4 +26,4 @@ testingUserRouter.route("/getProductHuntPosts/:topic").get(getProductHuntPosts);
 testingUserRouter.route("/getMorningFeedback").get(concatenateallApis);
 testingUserRouter.route("/perplexityNews").get(perplexityApi);
 testingUserRouter.route("/getUnreadMessages").get(getUnreadMessages);
-testingUserRouter.route("/sendMessage/:text").get(sendMessage);
+testingUserRouter.route("/sendMessage").post(sendMessage);

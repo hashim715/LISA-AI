@@ -563,7 +563,11 @@ export const sendMessage: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { text } = req.params;
+    const { text }: { text: string } = req.body;
+
+    if (!text.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
 
     const { username }: { username: string } = jwt_decode(token);
 

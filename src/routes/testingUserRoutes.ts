@@ -10,6 +10,7 @@ import {
   concatenateallApis,
   perplexityApi,
   getUnreadMessages,
+  sendMessage,
 } from "../controllers/testinguser";
 
 export const testingUserRouter: Router = express.Router();
@@ -25,3 +26,4 @@ testingUserRouter.route("/getProductHuntPosts/:topic").get(getProductHuntPosts);
 testingUserRouter.route("/getMorningFeedback").get(concatenateallApis);
 testingUserRouter.route("/perplexityNews").get(perplexityApi);
 testingUserRouter.route("/getUnreadMessages").get(getUnreadMessages);
+testingUserRouter.route("/sendMessage").get(sendMessage);

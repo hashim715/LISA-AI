@@ -396,9 +396,21 @@ export const getUser: RequestHandler = async (
   try {
     const token = req.cookies.authToken;
 
+    if (!token) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exists" });
+    }
+
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exists" });
+    }
 
     return res.status(200).json({ success: true, message: user });
   } catch (err) {
@@ -416,7 +428,21 @@ export const logOut: RequestHandler = async (
   try {
     const token = req.cookies.authToken;
 
+    if (!token) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exists" });
+    }
+
     const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exists" });
+    }
 
     await prisma.user.update({
       where: { username: username },
@@ -448,10 +474,18 @@ export const refreshToken: RequestHandler = async (
   try {
     const token = req.cookies.authToken;
 
+    if (!token) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exists" });
+    }
+
     const user = await prisma.user.findFirst({ where: { token: token } });
 
     if (!user) {
-      return badRequestResponse(res, "Invalid refresh token");
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exists" });
     }
 
     await sendTokenCookie(res, user.username);

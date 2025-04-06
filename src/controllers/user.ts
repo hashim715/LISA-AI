@@ -504,6 +504,10 @@ export const getUnreadMessages: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
+    if (!user.slack_login) {
+      return badRequestResponse(res, "User is not connected with slack");
+    }
+
     const conversations = await getConversations(user.slack_user_access_token);
 
     if (!conversations) {
@@ -580,6 +584,10 @@ export const sendMessage: RequestHandler = async (
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user.slack_login) {
+      return badRequestResponse(res, "User is not connected with slack");
+    }
 
     const conversations = await getConversations(user.slack_user_access_token);
 

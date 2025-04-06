@@ -333,7 +333,7 @@ export const getProductHuntPosts: RequestHandler = async (
 
     return res.status(200).json({ success: true, message: formattedProducts });
   } catch (err) {
-    console.log(err.response.data);
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }
@@ -473,9 +473,24 @@ export const perplexityApi: RequestHandler = async (
       },
     });
 
+    const news = `
+      Half the western side of the San Francisco the spring seasons and early summer are covered by fog. This is brought about by the meeting of the cold current from the Pacific Ocean and the warm current coming from mainland California, but the fog is less experienced in the eastern part of San Francisco. The fall seasons and late summer seasons are the hottest months of the year (Cronquist 45).
+      Even though the temperatures are almost the same throughout the year, there are two defined seasons i.e. dry and wet. 80% of the precipitations yearly always take place between November and March. Most of the morning in summer is mostly covered by fog, coming when the ocean is cool and backing on the hills.
+
+      This area is sometimes called the ‘biome region’ is just like a desert. Most of the plants which are found in this region are less than one meter in height and mostly consist of shrubs, having characteristics similar to those in the desert, which help them to adapt during dry hot seasons. Many of these plants are yearly, they flower during the winter at this time there is plenty of water due to water but during the hot and dry season, they exist in terms of seeds. These plants are characterized by having small leaves to prevent them from losing water during dry seasons, their leave is always evergreen and lastly, they curled with their stomata below the leaf (Cronquist 76).
+
+      The region of Salt Lake City in Utah is semi-arid and is found in the Salt: Lake Valley. This region is surrounded by mountains and receives little rain. Salt Lake region has four defined climatic changes. These seasons are; cold season, snow winter season, a hot & dry summer season, and wet season.
+
+      The region is near the Pacific Ocean which influences the climate of this place. Storms are mostly experienced from October to May and it only receives rain during the spring seasons. In winter the region experiences snowfall this is as a result of the effect of the Great Salt Lake. The summers are hot and wet; sometimes the temperature reaches 38 degrees Celsius. Due to monsoon winds from the Gulf of California, it experiences precipitation.
+    `;
+
+    // return res.status(200).json({
+    //   success: true,
+    //   message: response.data.choices[0].message.content,
+    // });
     return res.status(200).json({
       success: true,
-      message: response.data.choices[0].message.content,
+      message: news,
     });
   } catch (err) {
     console.log(err);

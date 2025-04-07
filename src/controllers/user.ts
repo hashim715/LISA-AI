@@ -634,3 +634,33 @@ export const sendMessage: RequestHandler = async (
     }
   }
 };
+
+export const getAuthorizedUrl: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    return res.status(200).json({ success: true, message: "Authorized url" });
+  } catch (err) {
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const refreshAccessTokenController: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    return res
+      .status(200)
+      .json({ success: true, message: "Token refreshed successfully" });
+  } catch (err) {
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};

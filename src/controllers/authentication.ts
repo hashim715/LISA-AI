@@ -305,7 +305,6 @@ export const outlookredirectauth: RequestHandler = async (
     const token = req.cookies.authToken;
 
     if (token) {
-      console.log("wait i am integrating outlook account");
       return integrateOutlookAccount(code, token, res);
     }
 
@@ -603,7 +602,7 @@ export const slackAuth: RequestHandler = async (
         user_scope: process.env.SLACK_USER_SCOPES, // User token scopes
       });
 
-    return res.redirect(authUrl);
+    return res.status(200).json({ success: true, message: authUrl });
   } catch (err) {
     if (!res.headersSent) {
       return internalServerError(res);

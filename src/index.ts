@@ -51,10 +51,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     .json({ success: false, message: "Something went wrong try again.." });
 });
 
-app.use("/v1/testing", testingRouter);
+// app.use("/v1/testing", testingRouter);
 app.use("/v1/auth", authRouter);
 app.use("/v1/user", userRouter);
-app.use("/v1/testingUser", testingUserRouter);
+// app.use("/v1/testingUser", testingUserRouter);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) {

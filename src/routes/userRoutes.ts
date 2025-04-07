@@ -38,7 +38,7 @@ userRouter
 userRouter
   .route("/getMorningFeedback")
   .get(protectAgent, refreshAccessToken, concatenateallApis);
-userRouter.route("/perplexityNews").get(protectAgent, perplexityApi);
+userRouter.route("/perplexityNews").post(protectAgent, perplexityApi);
 userRouter.route("/getUnreadMessages").get(protectAgent, getUnreadMessages);
 userRouter.route("/sendMessage").get(protectAgent, sendMessage);
 userRouter

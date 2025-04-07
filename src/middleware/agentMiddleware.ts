@@ -16,13 +16,7 @@ export const protectAgent: RequestHandler = async (
   res: Response,
   next: NextFunction
 ) => {
-  let token: string;
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
-  }
+  let { token }: { token: string } = req.body;
 
   console.log(token);
 

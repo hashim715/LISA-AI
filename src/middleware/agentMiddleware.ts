@@ -24,6 +24,8 @@ export const protectAgent: RequestHandler = async (
     token = req.headers.authorization.split(" ")[1];
   }
 
+  console.log(token);
+
   if (!token) {
     return unauthorizedErrorResponse(res);
   }
@@ -43,6 +45,7 @@ export const protectAgent: RequestHandler = async (
 
     next();
   } catch (err) {
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

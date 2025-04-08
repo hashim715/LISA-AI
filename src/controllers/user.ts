@@ -610,22 +610,28 @@ export const sendMessage: RequestHandler = async (
       channelMap.set(channel.name, channel.id);
     }
 
-    const processedInput: string = await processUserInput(text, channelMap);
+    const processedInput = await processUserInput(text, channelMap);
 
-    if (!processedInput.trim()) {
+    console.log(processedInput);
+
+    if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");
     }
 
     const { channel, message }: { channel: string; message: string } =
       JSON.parse(processedInput);
 
-    if (!channel.trim() || !message.trim()) {
+    console.log(channel, message);
+
+    if (!channel || !message) {
       return badRequestResponse(res, "Please provide valid input");
     }
 
-    const channelID: string = channelMap.get(channel.toLowerCase());
+    const channelID = channelMap.get(channel.toLowerCase());
 
-    if (!channelID.trim()) {
+    console.log(channelID);
+
+    if (!channelID) {
       return res
         .status(400)
         .json({ success: false, messaeg: "Message not sent" });

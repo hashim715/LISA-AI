@@ -7,6 +7,7 @@ export const processUserInput = async (
   channelMap: Map<string, string>
 ): Promise<any | null> => {
   try {
+    const channelList = JSON.stringify(Object.fromEntries(channelMap), null, 2);
     const prompt = `
         You are an assistant that extracts information from user requests to send Slack messages.
         Given a sentence and a channel mapping, identify:
@@ -14,7 +15,7 @@ export const processUserInput = async (
         2. The message content to send to that channel.
         
         Available channels and their IDs:
-        ${JSON.stringify(channelMap, null, 2)}
+        ${channelList}
 
         If the input doesn't specify a channel or message, return null for those fields.
         Return the result as a JSON object.

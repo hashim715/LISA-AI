@@ -451,7 +451,7 @@ export const perplexityApi: RequestHandler = async (
     const apiUrl = "https://api.perplexity.ai/chat/completions";
     const token = process.env.PERPLEXITY_API_KEY;
 
-    const { query } = req.params;
+    const { query }: { query: string } = req.body;
 
     if (!query.trim()) {
       return badRequestResponse(res, "Please provide valid inputs");
@@ -582,9 +582,7 @@ export const sendMessage: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { text } = req.params;
-
-    console.log(text);
+    const { text }: { text: string } = req.body;
 
     if (!text.trim()) {
       return badRequestResponse(res, "Please provide valid input");
@@ -612,26 +610,26 @@ export const sendMessage: RequestHandler = async (
       channelMap.set(channel.name, channel.id);
     }
 
-    console.log(channelMap);
+    const processedInput: string = await processUserInput(text, channelMap);
 
-    const processedInput = await processUserInput(text, channelMap);
-
-    if (!processedInput) {
+    if (!processedInput.trim()) {
       return badRequestResponse(res, "Please provide valid input");
     }
 
     const { channel, message }: { channel: string; message: string } =
       JSON.parse(processedInput);
 
-    console.log(channel, message);
-
-    if (!channel || !message) {
+    if (!channel.trim() || !message.trim()) {
       return badRequestResponse(res, "Please provide valid input");
     }
 
-    const channelID = channelMap.get(channel);
+    const channelID: string = channelMap.get(channel.toLowerCase());
 
-    console.log(channelID);
+    if (!channelID.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, messaeg: "Message not sent" });
+    }
 
     const data = await sendMessageAsUser(
       user.slack_user_access_token,

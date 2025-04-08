@@ -13,6 +13,7 @@ export const processUserInput = async (
         1. The Slack channel name (e.g., "planning", "general").
         2. The message content to send to that channel.
         3. You can find the channel name by using channel map that is provided you if you find a channel name that is matching to some extent in channel map so use channel name from the channel map.
+        
         If the input doesn't specify a channel or message, return null for those fields.
         Return the result as a JSON object.
 

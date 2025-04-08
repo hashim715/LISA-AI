@@ -584,6 +584,8 @@ export const sendMessage: RequestHandler = async (
   try {
     const { text } = req.params;
 
+    console.log(text);
+
     if (!text.trim()) {
       return badRequestResponse(res, "Please provide valid input");
     }

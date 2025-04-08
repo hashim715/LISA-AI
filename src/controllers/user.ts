@@ -610,6 +610,8 @@ export const sendMessage: RequestHandler = async (
       channelMap.set(channel.name, channel.id);
     }
 
+    console.log(channelMap);
+
     const processedInput = await processUserInput(text, channelMap);
 
     if (!processedInput) {
@@ -619,11 +621,15 @@ export const sendMessage: RequestHandler = async (
     const { channel, message }: { channel: string; message: string } =
       JSON.parse(processedInput);
 
+    console.log(channel, message);
+
     if (!channel || !message) {
       return badRequestResponse(res, "Please provide valid input");
     }
 
     const channelID = channelMap.get(channel.toLowerCase());
+
+    console.log(channelID);
 
     const data = await sendMessageAsUser(
       user.slack_user_access_token,

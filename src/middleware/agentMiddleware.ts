@@ -18,8 +18,6 @@ export const protectAgent: RequestHandler = async (
 ) => {
   let { token }: { token: string } = req.body;
 
-  console.log(token);
-
   if (!token) {
     return unauthorizedErrorResponse(res);
   }
@@ -29,11 +27,7 @@ export const protectAgent: RequestHandler = async (
 
     const { username }: { username: string } = jwt_decode(token);
 
-    console.log(username);
-
     const user = await prisma.user.findFirst({ where: { username: username } });
-
-    console.log(user);
 
     if (!user) {
       return notFoundResponse(res);

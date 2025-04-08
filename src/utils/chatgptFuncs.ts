@@ -2,13 +2,17 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export const processUserInput = async (input: string): Promise<any | null> => {
+export const processUserInput = async (
+  input: string,
+  channelMap: Map<string, string>
+): Promise<any | null> => {
   try {
     const prompt = `
         You are an assistant that extracts information from user requests to send Slack messages.
         Given a sentence, identify:
         1. The Slack channel name (e.g., "planning", "general").
         2. The message content to send to that channel.
+        3. You can find the channel name by using channel map that is provided you if you find a channel name that is matching to some extent in channel map so use channel name from the channel map.
         If the input doesn't specify a channel or message, return null for those fields.
         Return the result as a JSON object.
 
@@ -21,6 +25,7 @@ export const processUserInput = async (input: string): Promise<any | null> => {
         Output: {"channel": "general", "message": "Hey Shahbaz, where are we on the project status?"}
 
         Input: ${input}
+        Channel Map : ${channelMap}
     `;
 
     const response = await openai.chat.completions.create({

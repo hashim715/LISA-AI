@@ -610,7 +610,7 @@ export const sendMessage: RequestHandler = async (
       channelMap.set(channel.name, channel.id);
     }
 
-    const processedInput = await processUserInput(text);
+    const processedInput = await processUserInput(text, channelMap);
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");

@@ -23,24 +23,24 @@ export const userRouter: Router = express.Router();
 
 userRouter
   .route("/getUnreadEmails")
-  .get(protectAgent, refreshAccessToken, getUnreadEmails);
+  .post(protectAgent, refreshAccessToken, getUnreadEmails);
 userRouter
   .route("/getCalenderEvents")
-  .get(protectAgent, refreshAccessToken, getCalenderEvents);
+  .post(protectAgent, refreshAccessToken, getCalenderEvents);
 userRouter
   .route("/getEmailsUsingSearchQuery/:searchField")
-  .get(protectAgent, refreshAccessToken, getEmailsUsingSearchQuery);
+  .post(protectAgent, refreshAccessToken, getEmailsUsingSearchQuery);
 userRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
-userRouter.route("/notionData").get(protectAgent, notionDataApi);
+userRouter.route("/notionData").post(protectAgent, notionDataApi);
 userRouter
   .route("/getProductHuntPosts/:topic")
-  .get(protectAgent, getProductHuntPosts);
+  .post(protectAgent, getProductHuntPosts);
 userRouter
   .route("/getMorningFeedback")
-  .get(protectAgent, refreshAccessToken, concatenateallApis);
-userRouter.route("/perplexityNews").post(protectAgent, perplexityApi);
-userRouter.route("/getUnreadMessages").get(protectAgent, getUnreadMessages);
-userRouter.route("/sendMessage").get(protectAgent, sendMessage);
+  .post(protectAgent, refreshAccessToken, concatenateallApis);
+userRouter.route("/perplexityNews/:query").post(protectAgent, perplexityApi);
+userRouter.route("/getUnreadMessages").post(protectAgent, getUnreadMessages);
+userRouter.route("/sendMessage/:text").post(protectAgent, sendMessage);
 userRouter
   .route("/getAuthorizedUrl")
   .get(protect, refreshAccessToken, getAuthorizedUrl);

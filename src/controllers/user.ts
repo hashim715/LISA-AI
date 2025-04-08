@@ -451,11 +451,17 @@ export const perplexityApi: RequestHandler = async (
     const apiUrl = "https://api.perplexity.ai/chat/completions";
     const token = process.env.PERPLEXITY_API_KEY;
 
+    const { query } = req.params;
+
+    if (!query.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
     const requestData = {
       model: "sonar",
       messages: [
         { role: "system", content: "Be precise and concise." },
-        { role: "user", content: "how is the weather today in san francisco?" },
+        { role: "user", content: query },
       ],
       max_tokens: 123,
       temperature: 0.2,
@@ -576,8 +582,11 @@ export const sendMessage: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const text =
-      "send a message to shahbaz on channel general that i want to discuss about lisa project something important";
+    const { text } = req.params;
+
+    if (!text.trim()) {
+      return badRequestResponse(res, "Please provide valid input");
+    }
 
     const token = req.cookies.authToken;
 

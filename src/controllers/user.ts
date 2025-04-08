@@ -627,7 +627,7 @@ export const sendMessage: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid input");
     }
 
-    const channelID = channelMap.get(channel.toLowerCase());
+    const channelID = channelMap.get(channel);
 
     console.log(channelID);
 

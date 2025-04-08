@@ -9,9 +9,13 @@ export const processUserInput = async (
   try {
     const prompt = `
         You are an assistant that extracts information from user requests to send Slack messages.
-        Given a sentence, identify:
-        1. The Slack channel name (e.g., "planning", "general").
+        Given a sentence and a channel mapping, identify:
+        1. The correct Slack channel name from the provided mapping.
         2. The message content to send to that channel.
+        
+        Available channels and their IDs:
+        ${JSON.stringify(channelMap, null, 2)}
+
         If the input doesn't specify a channel or message, return null for those fields.
         Return the result as a JSON object.
 
@@ -24,7 +28,6 @@ export const processUserInput = async (
         Output: {"channel": "general", "message": "Hey Shahbaz, where are we on the project status?"}
 
         Input: ${input}
-        Channel Map : ${channelMap}
     `;
 
     const response = await openai.chat.completions.create({

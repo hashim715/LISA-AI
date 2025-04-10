@@ -731,8 +731,6 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       new Date().toISOString()
     );
 
-    console.log(processedInput);
-
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");
     }
@@ -753,8 +751,6 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       attendees: any;
     } = JSON.parse(processedInput);
 
-    console.log(attendees);
-
     const emailArray = [];
 
     for (const name of attendees) {
@@ -771,7 +767,7 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       const { from }: { from: string } = JSON.parse(processedSearchQueryEmail);
 
       if (from) {
-        emailArray.push(from);
+        emailArray.push({ email: from });
       }
     }
 

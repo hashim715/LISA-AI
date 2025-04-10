@@ -287,7 +287,7 @@ export const addGoogleCalenderEventFunc = async (
   end: any,
   attendees: any
 ) => {
-  const calendarId = "primary"; // default calendar
+  const calendarId = "primary";
   const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`;
 
   const event = {
@@ -425,10 +425,11 @@ export const getReplySenderEmailsUsingSearchQuery = async (
   access_token: string
 ) => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 10 * 24 * 60 * 60;
+    const oneDayAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
 
     const params = {
       q: `"${searchQuery}" category:primary after:${oneDayAgo}`,
+      maxResults: 100,
     };
 
     const listResponse = await axios.get(
@@ -484,7 +485,7 @@ export const getSenderEmailsUsingSearchQuery = async (
   access_token: string
 ) => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
+    const oneDayAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
 
     const params = {
       q: `"${searchQuery}" category:primary after:${oneDayAgo}`,

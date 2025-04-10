@@ -143,6 +143,12 @@ export const getGmailDraftFieldsUsingLLM = async (input: string) => {
     - name
     - subject
     - bodyContent
+
+      Example: 
+      Instruction: Write an email to Sam how the presentation went. 
+      -name : shahbaz
+      -subject: Presentation update
+      -bodyContent: Hey Shahbaz, how did the presentation go?
     
     Instruction: "${input}"
     `;

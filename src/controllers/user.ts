@@ -874,7 +874,9 @@ export const draftGoogleGmail: RequestHandler = async (
       });
     }
 
-    return res.status(200).json({ success: true, message: data });
+    return res
+      .status(200)
+      .json({ success: true, message: "Email drafted successfully" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -935,14 +937,12 @@ export const draftGoogleGmailReply: RequestHandler = async (
       user.google_access_token
     );
 
-    if (!replyEmailMetaData) {
+    if (!replyEmailMetaData || replyEmailMetaData.length === 0) {
       return badRequestResponse(
         res,
         "Could not find emails for the given name"
       );
     }
-
-    console.log(replyEmailMetaData);
 
     const processedSearchQueryEmail = await getMatchingReplyGmail(
       name,
@@ -997,6 +997,10 @@ export const draftGoogleGmailReply: RequestHandler = async (
         "could not create draft reply email try again with valid inputs"
       );
     }
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Email drafted successfully" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

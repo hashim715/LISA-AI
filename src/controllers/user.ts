@@ -726,7 +726,10 @@ export const addGoogleCalenderEvent: RequestHandler = async (
         .json({ success: false, message: "User is not connected to google" });
     }
 
-    const processedInput = await getGoogleCalenderFieldsUsingLLM(text);
+    const processedInput = await getGoogleCalenderFieldsUsingLLM(
+      text,
+      new Date().toISOString()
+    );
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");

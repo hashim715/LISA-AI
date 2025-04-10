@@ -92,7 +92,10 @@ export const summarizeNotionWithLLM = async (allContent: any) => {
   }
 };
 
-export const getGoogleCalenderFieldsUsingLLM = async (input: string) => {
+export const getGoogleCalenderFieldsUsingLLM = async (
+  input: string,
+  today_date: string
+) => {
   try {
     const prompt = `
       Extract event details from this user instruction and return it as a JSON object with keys:
@@ -101,7 +104,13 @@ export const getGoogleCalenderFieldsUsingLLM = async (input: string) => {
       - location
       - start: { dateTime, timeZone }
       - end: { dateTime, timeZone }
-      - attendees (optional): array of emails like [{ email: "example@example.com" }]
+      - attendees (optional): array of emails like [{ email: “example@gmail.com" }]
+
+      Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies 	for my startup. Keep it an hour long. 
+
+      If time zone is not mentioned, keep it in pacific time. 
+
+      Today’s date is: “${today_date}”
 
       Instruction: "${input}"
     `;

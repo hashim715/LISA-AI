@@ -86,7 +86,10 @@ export const getOutlookEmails = async (
 
     return summarizedEmails;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get outlook unread emails error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };
@@ -153,7 +156,10 @@ export const getOutlookCalenderEvents = async (
 
     return eventsData;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get outlook calender events error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };
@@ -249,7 +255,10 @@ export const getOutlookEmailsFromSpecificSender = async (
 
     return summarizedEmails;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get outlook emails using search query error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };

@@ -15,8 +15,13 @@ import {
   formatPageContent,
 } from "../utils/notionFuncs";
 import {
-  processUserInput,
+  getChannelNameUsingLLM,
   summarizeNotionWithLLM,
+  getGoogleCalenderFieldsUsingLLM,
+  getGmailDraftFieldsUsingLLM,
+  getMatchingGmail,
+  getMatchingReplyGmail,
+  getReplyGmailDraftFieldsUsingLLM,
 } from "../utils/chatgptFuncs";
 import {
   getConversations,
@@ -30,6 +35,11 @@ import {
   getGoogleEmails,
   getGoogleCalenderEvents,
   getGoogleEmailsFromSpecificSender,
+  addGoogleCalenderEventFunc,
+  createGmailDraft,
+  getSenderEmailsUsingSearchQuery,
+  createGmailReplyDraft,
+  getReplySenderEmailsUsingSearchQuery,
 } from "../utils/gmailApi";
 import {
   getOutlookEmails,
@@ -102,8 +112,8 @@ export const getEmailsUsingSearchQuery: RequestHandler = async (
 
     const { searchField } = req.params;
 
-    if (!searchField.trim()) {
-      return badRequestResponse(res, "Please provide valid inputs");
+    if (!searchField || !searchField.trim()) {
+      return badRequestResponse(res, "please provide a valid search query.");
     }
 
     let google_emails: Array<any> = [];
@@ -291,6 +301,13 @@ export const getProductHuntPosts: RequestHandler = async (
   try {
     const { topic } = req.params;
 
+    if (!topic || !topic.trim()) {
+      return badRequestResponse(
+        res,
+        "please provide a valid to search for products"
+      );
+    }
+
     const datetime = new Date();
     datetime.setUTCDate(datetime.getUTCDate() - 1);
     datetime.setUTCHours(datetime.getUTCHours() - 7);
@@ -453,8 +470,8 @@ export const perplexityApi: RequestHandler = async (
 
     const { query }: { query: string } = req.body;
 
-    if (!query.trim()) {
-      return badRequestResponse(res, "Please provide valid inputs");
+    if (!query || !query.trim()) {
+      return badRequestResponse(res, "please provide a valid query to search.");
     }
 
     const requestData = {
@@ -584,7 +601,7 @@ export const sendMessage: RequestHandler = async (
   try {
     const { text }: { text: string } = req.body;
 
-    if (!text.trim()) {
+    if (!text || !text.trim()) {
       return badRequestResponse(res, "Please provide valid input");
     }
 
@@ -610,9 +627,7 @@ export const sendMessage: RequestHandler = async (
       channelMap.set(channel.name, channel.id);
     }
 
-    const processedInput = await processUserInput(text, channelMap);
-
-    console.log(processedInput);
+    const processedInput = await getChannelNameUsingLLM(text, channelMap);
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");
@@ -621,20 +636,21 @@ export const sendMessage: RequestHandler = async (
     const { channel, message }: { channel: string; message: string } =
       JSON.parse(processedInput);
 
-    console.log(channel, message);
-
-    if (!channel || !message) {
-      return badRequestResponse(res, "Please provide valid input");
+    if (!channel || !channel.trim() || !message || !message.trim()) {
+      return badRequestResponse(
+        res,
+        "please provide valid channel and message to send"
+      );
     }
 
     const channelID = channelMap.get(channel.toLowerCase());
 
-    console.log(channelID);
-
-    if (!channelID) {
-      return res
-        .status(400)
-        .json({ success: false, messaeg: "Message not sent" });
+    if (!channelID || !channelID.trim()) {
+      return res.status(400).json({
+        success: false,
+        messaeg:
+          "channel not found can you please try again with valid channel name",
+      });
     }
 
     const data = await sendMessageAsUser(
@@ -680,6 +696,294 @@ export const refreshAccessTokenController: RequestHandler = async (
       .status(200)
       .json({ success: true, message: "Token refreshed successfully" });
   } catch (err) {
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const addGoogleCalenderEvent: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { text }: { text: string } = req.body;
+
+    if (!text || !text.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user.google_login) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User is not connected to google" });
+    }
+
+    const processedInput = await getGoogleCalenderFieldsUsingLLM(text);
+
+    if (!processedInput) {
+      return badRequestResponse(res, "Please provide valid input");
+    }
+
+    const {
+      summary,
+      description,
+      location,
+      start,
+      end,
+      attendees,
+    }: {
+      summary: string;
+      description: string;
+      location: string;
+      start: any;
+      end: any;
+      attendees: any;
+    } = JSON.parse(processedInput);
+
+    const data = await addGoogleCalenderEventFunc(
+      user.google_access_token,
+      summary,
+      description,
+      location,
+      start,
+      end,
+      attendees
+    );
+
+    if (!data) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "could not add calender event can you please try again may be something wrong with the input you provided",
+      });
+    }
+
+    return res.status(200).json({ success: true, message: data });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const draftGoogleGmail: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { text }: { text: string } = req.body;
+
+    if (!text || !text.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user.google_login) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User is not connected to google" });
+    }
+
+    const processedInput = await getGmailDraftFieldsUsingLLM(text);
+
+    if (!processedInput) {
+      return badRequestResponse(res, "Please provide valid input");
+    }
+
+    const {
+      name,
+      bodyContent,
+      subject,
+    }: {
+      name: string;
+      bodyContent: string;
+      subject: string;
+    } = JSON.parse(processedInput);
+
+    if (!name || !name.trim() || !bodyContent || !bodyContent.trim()) {
+      return badRequestResponse(
+        res,
+        "Ask the user to tell name,body,subject correctly one of the field is not specified correctly"
+      );
+    }
+
+    const emailMetaData = await getSenderEmailsUsingSearchQuery(
+      name,
+      user.google_access_token
+    );
+
+    const processedSearchQueryEmail = await getMatchingGmail(
+      name,
+      emailMetaData
+    );
+
+    if (!processedSearchQueryEmail) {
+      return badRequestResponse(
+        res,
+        "Could not find emails for the given name"
+      );
+    }
+
+    const { from }: { from: string } = JSON.parse(processedSearchQueryEmail);
+
+    if (!from || !from.trim()) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Tell the user i tried to find the reciever email couldn't find it so please specify exactly to whon to send this email",
+      });
+    }
+
+    const data = await createGmailDraft(
+      user.google_access_token,
+      user.google_email,
+      from,
+      user.name,
+      subject,
+      bodyContent
+    );
+
+    if (!data) {
+      return res.status(400).json({
+        success: false,
+        message: "could not draft email please try again",
+      });
+    }
+
+    return res.status(200).json({ success: true, message: data });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const draftGoogleGmailReply: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { text }: { text: string } = req.body;
+
+    if (!text || !text.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user.google_login) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User is not connected to google" });
+    }
+
+    const processedInput = await getReplyGmailDraftFieldsUsingLLM(text);
+
+    if (!processedInput) {
+      return badRequestResponse(res, "please provide valid input");
+    }
+
+    const {
+      name,
+      bodyContent,
+    }: {
+      name: string;
+      bodyContent: string;
+    } = JSON.parse(processedInput);
+
+    if (!name || !name.trim() || !bodyContent || !bodyContent.trim()) {
+      return badRequestResponse(
+        res,
+        "Ask the user to tell name,body correctly one of the field is not specified correctly"
+      );
+    }
+
+    const replyEmailMetaData = await getReplySenderEmailsUsingSearchQuery(
+      name,
+      user.google_access_token
+    );
+
+    if (!replyEmailMetaData) {
+      return badRequestResponse(
+        res,
+        "Could not find emails for the given name"
+      );
+    }
+
+    const processedSearchQueryEmail = await getMatchingReplyGmail(
+      name,
+      replyEmailMetaData
+    );
+
+    if (!processedSearchQueryEmail) {
+      return badRequestResponse(
+        res,
+        "Could not find emails for the given name"
+      );
+    }
+
+    const {
+      messageId,
+      threadId,
+      subject,
+      from,
+    }: { messageId: string; threadId: string; subject: string; from: string } =
+      JSON.parse(processedSearchQueryEmail);
+
+    if (
+      !messageId ||
+      !messageId.trim() ||
+      !threadId ||
+      !threadId.trim() ||
+      !from ||
+      !from.trim()
+    ) {
+      return badRequestResponse(
+        res,
+        "Tell the user i tried to find the reciever email couldn't find it so please specify exactly to whom to reply"
+      );
+    }
+
+    const data = await createGmailReplyDraft(
+      user.google_access_token,
+      user.google_email,
+      from,
+      user.name,
+      subject,
+      bodyContent,
+      threadId,
+      messageId
+    );
+
+    if (!data) {
+      return badRequestResponse(
+        res,
+        "could not create draft reply email try again with valid inputs"
+      );
+    }
+  } catch (err) {
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

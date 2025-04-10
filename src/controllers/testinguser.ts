@@ -15,7 +15,7 @@ import {
   formatPageContent,
 } from "../utils/notionFuncs";
 import {
-  processUserInput,
+  getChannelNameUsingLLM,
   summarizeNotionWithLLM,
 } from "../utils/chatgptFuncs";
 import {
@@ -604,7 +604,7 @@ export const sendMessage: RequestHandler = async (
 
     console.log(channelMap);
 
-    const processedInput = await processUserInput(text, channelMap);
+    const processedInput = await getChannelNameUsingLLM(text, channelMap);
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");

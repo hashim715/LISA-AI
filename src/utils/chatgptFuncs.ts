@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export const processUserInput = async (
+export const getChannelNameUsingLLM = async (
   input: string,
   channelMap: Map<string, string>
 ): Promise<any | null> => {
@@ -86,6 +86,180 @@ export const summarizeNotionWithLLM = async (allContent: any) => {
     });
 
     return completion.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getGoogleCalenderFieldsUsingLLM = async (input: string) => {
+  try {
+    const prompt = `
+      Extract event details from this user instruction and return it as a JSON object with keys:
+      - summary
+      - description
+      - location
+      - start: { dateTime, timeZone }
+      - end: { dateTime, timeZone }
+      - attendees (optional): array of emails like [{ email: "example@example.com" }]
+
+      Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract calendar event information from user instructions.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getGmailDraftFieldsUsingLLM = async (input: string) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - name
+    - subject
+    - bodyContent
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getMatchingGmail = async (
+  input: string,
+  emailList: Array<any>
+) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - from use email list provided to find a matching email by the name that is provided you in prompt if email is not found then retrun name@example.com.
+
+    Available emails:
+    ${JSON.stringify(emailList)}
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getReplyGmailDraftFieldsUsingLLM = async (input: string) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - name
+    - bodyContent
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getMatchingReplyGmail = async (
+  input: string,
+  emailList: Array<any>
+) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - from use email list provided to find a matching email by the name that is provided you in prompt if email is not found then return null.
+    - messageId
+    - threadId
+    - subject
+
+
+    Available emails:
+    ${JSON.stringify(emailList)}
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
   } catch (err) {
     console.log(err);
     return null;

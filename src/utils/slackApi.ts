@@ -17,7 +17,10 @@ export const getConversations = async (slack_access_token: string) => {
 
     return response.data;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get conversations Error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };
@@ -45,7 +48,10 @@ export const sendMessageAsUser = async (
 
     return response.data;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "send slack message Error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };
@@ -66,7 +72,10 @@ export const getUsername = async (
 
     return null;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get slack username error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };
@@ -102,7 +111,10 @@ export const getUnreadMessagesFunc = async (
 
     return unreadMessages;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get slack unread messages error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };
@@ -129,7 +141,10 @@ export const getLastReadTimestamp = async (
 
     return null;
   } catch (err) {
-    console.log(err.response.data);
+    console.log(
+      "get slack last read timestamp error:",
+      err.response?.data || err.message || err
+    );
     return null;
   }
 };

@@ -731,6 +731,8 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       new Date().toISOString()
     );
 
+    console.log(processedInput);
+
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");
     }
@@ -751,6 +753,30 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       attendees: any;
     } = JSON.parse(processedInput);
 
+    console.log(attendees);
+
+    const emailArray = [];
+
+    for (const name of attendees) {
+      const emailMetaData = await getSenderEmailsUsingSearchQuery(
+        name,
+        user.google_access_token
+      );
+
+      const processedSearchQueryEmail = await getMatchingGmail(
+        name,
+        emailMetaData
+      );
+
+      const { from }: { from: string } = JSON.parse(processedSearchQueryEmail);
+
+      if (from) {
+        emailArray.push(from);
+      }
+    }
+
+    console.log(emailArray);
+
     const data = await addGoogleCalenderEventFunc(
       user.google_access_token,
       summary,
@@ -758,7 +784,7 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       location,
       start,
       end,
-      attendees
+      emailArray
     );
 
     if (!data) {

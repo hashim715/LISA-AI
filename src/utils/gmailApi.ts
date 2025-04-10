@@ -425,11 +425,10 @@ export const getReplySenderEmailsUsingSearchQuery = async (
   access_token: string
 ) => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 48 * 60 * 60;
+    const oneDayAgo = Math.floor(Date.now() / 1000) - 10 * 24 * 60 * 60;
 
     const params = {
       q: `"${searchQuery}" category:primary after:${oneDayAgo}`,
-      maxResults: 10,
     };
 
     const listResponse = await axios.get(

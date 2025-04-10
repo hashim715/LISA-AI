@@ -104,7 +104,7 @@ export const getGoogleCalenderFieldsUsingLLM = async (
       - location
       - start: { dateTime, timeZone }
       - end: { dateTime, timeZone }
-      - attendees (optional): array of emails like [{ email: “example@gmail.com" }]
+      - attendees (optional): array of attendies like [name]
 
       Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies 	for my startup. Keep it an hour long. 
 

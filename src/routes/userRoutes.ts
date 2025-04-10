@@ -17,6 +17,7 @@ import {
   draftGoogleGmail,
   draftGoogleGmailReply,
   getStaticData,
+  addUserDetails,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -57,6 +58,7 @@ userRouter.route("/sendMessage").post(protectAgent, sendMessage);
 userRouter
   .route("/getAuthorizedUrl")
   .get(protect, refreshAccessToken, getAuthorizedUrl);
+userRouter.route("/addUserPreferences").post(protectAgent, addUserDetails);
 userRouter
   .route("/refreshAccessTokens")
   .get(protect, refreshAccessToken, refreshAccessTokenController);

@@ -1063,3 +1063,24 @@ export const getStaticData: RequestHandler = async (
     }
   }
 };
+
+export const addUserDetails: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { prompt }: { prompt: string } = req.body;
+
+    console.log(prompt);
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Got the user preferences" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};

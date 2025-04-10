@@ -108,7 +108,7 @@ export const getGoogleCalenderFieldsUsingLLM = async (
 
       Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies 	for my startup. Keep it an hour long. 
 
-      If time zone is not mentioned, keep it in pacific time. 
+      Get the timezone according to location and if it is not there then keep it in pacific time. if timezone is mentioned explicitly then use that one.
 
       Today’s date is: “${today_date}”
 

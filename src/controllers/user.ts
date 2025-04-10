@@ -808,6 +808,8 @@ export const draftGoogleGmail: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid input");
     }
 
+    console.log(processedInput);
+
     const {
       name,
       bodyContent,
@@ -830,6 +832,8 @@ export const draftGoogleGmail: RequestHandler = async (
       user.google_access_token
     );
 
+    console.log(emailMetaData);
+
     const processedSearchQueryEmail = await getMatchingGmail(
       name,
       emailMetaData
@@ -841,6 +845,8 @@ export const draftGoogleGmail: RequestHandler = async (
         "Could not find emails for the given name"
       );
     }
+
+    console.log(processedSearchQueryEmail);
 
     const { from }: { from: string } = JSON.parse(processedSearchQueryEmail);
 
@@ -907,6 +913,8 @@ export const draftGoogleGmailReply: RequestHandler = async (
       return badRequestResponse(res, "please provide valid input");
     }
 
+    console.log(processedInput);
+
     const {
       name,
       bodyContent,
@@ -934,6 +942,8 @@ export const draftGoogleGmailReply: RequestHandler = async (
       );
     }
 
+    console.log(replyEmailMetaData);
+
     const processedSearchQueryEmail = await getMatchingReplyGmail(
       name,
       replyEmailMetaData
@@ -945,6 +955,8 @@ export const draftGoogleGmailReply: RequestHandler = async (
         "Could not find emails for the given name"
       );
     }
+
+    console.log(processedSearchQueryEmail);
 
     const {
       messageId,

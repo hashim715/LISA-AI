@@ -751,7 +751,7 @@ export const addGoogleCalenderEvent: RequestHandler = async (
       attendees: any;
     } = JSON.parse(processedInput);
 
-    const emailArray = [];
+    let emailArray = [];
 
     for (const name of attendees) {
       const emailMetaData = await getSenderEmailsUsingSearchQuery(
@@ -770,6 +770,10 @@ export const addGoogleCalenderEvent: RequestHandler = async (
         emailArray.push({ email: from });
       }
     }
+
+    emailArray = emailArray.filter(
+      (email) => email.email !== "name@example.com"
+    );
 
     console.log(emailArray);
 

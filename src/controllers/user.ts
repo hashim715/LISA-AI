@@ -1034,3 +1034,32 @@ export const draftGoogleGmailReply: RequestHandler = async (
     }
   }
 };
+
+export const getStaticData: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const prompt = `
+     5:00 PM: Unveiling of 45-Foot Naked Statue "R-Evolution" at Embarcadero Plaza (Free)
+
+      7:00 PM: Bees and the Native Plants They Love (Free, donations welcome)
+
+      7:00 PM: SF Unplugged at Savoy Tivoli with Anthony Arya & Joe Kaplow ($20, includes a free drink with an advanced ticket)
+
+      7:30 PM: You’re Going to Die Presents: Climate Grief ($15)
+
+      8:00 PM: Basement Jaxx ($60.38)
+
+      9:00 PM: "The Monster Show" – Drag Tribute to The Beatles at The Edge ($5)
+    `;
+
+    return res.status(200).json({ success: true, message: prompt });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};

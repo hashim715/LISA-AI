@@ -16,6 +16,7 @@ import {
   addGoogleCalenderEvent,
   draftGoogleGmail,
   draftGoogleGmailReply,
+  getStaticData,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -59,3 +60,5 @@ userRouter
 userRouter
   .route("/refreshAccessTokens")
   .get(protect, refreshAccessToken, refreshAccessTokenController);
+
+userRouter.route("/getStaticData").get(getStaticData);

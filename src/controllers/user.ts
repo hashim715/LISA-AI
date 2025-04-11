@@ -363,7 +363,7 @@ export const getProductHuntPosts: RequestHandler = async (
   }
 };
 
-export const concatenateallApis: RequestHandler = async (
+export const getMorningUpdate: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -432,6 +432,11 @@ export const concatenateallApis: RequestHandler = async (
       notion_summary = await summarizeNotionWithLLM(allContent);
       console.log("\nDone generating summary...");
     }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { morning_update_check: true },
+    });
 
     return res.status(200).json({
       success: true,

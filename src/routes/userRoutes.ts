@@ -7,7 +7,7 @@ import {
   getCalenderEvents,
   notionDataApi,
   getProductHuntPosts,
-  concatenateallApis,
+  getMorningUpdate,
   perplexityApi,
   getUnreadMessages,
   sendMessage,
@@ -56,7 +56,7 @@ userRouter
   .post(protectAgent, getProductHuntPosts);
 userRouter
   .route("/getMorningFeedback")
-  .post(protectAgent, refreshAccessToken, concatenateallApis);
+  .post(protectAgent, refreshAccessToken, getMorningUpdate);
 userRouter.route("/perplexityNews").post(protectAgent, perplexityApi);
 userRouter.route("/getUnreadMessages").post(protectAgent, getUnreadMessages);
 userRouter.route("/sendMessage").post(protectAgent, sendMessage);

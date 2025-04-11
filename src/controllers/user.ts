@@ -1126,7 +1126,7 @@ export const updatePreferences: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { preferences: summary },
+      data: { preferences: summary, preferences_added: true },
     });
 
     return res
@@ -1209,7 +1209,7 @@ export const updateUserPreferences: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { preferences: prompt },
+      data: { preferences: prompt, preferences_added: true },
     });
 
     return res
@@ -1249,6 +1249,21 @@ export const addMorningPreferences: RequestHandler = async (
     return res
       .status(200)
       .json({ success: true, message: "Update the user morning preferences" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const getPublicEvents: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    return res.status(200).json({ success: true, message: "Events" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

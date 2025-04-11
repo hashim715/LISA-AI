@@ -76,6 +76,8 @@ userRouter
 userRouter.route("/updateUserPreferences").post(protect, updateUserPreferences);
 userRouter.route("/addMorningPreferences").post(protect, addMorningPreferences);
 userRouter.route("/getStaticData").get(getStaticData);
-userRouter.route("/getProductHuntPosts/:topic").get(getProductHuntPosts);
-userRouter.route("/perplexityNews").post(perplexityApi);
-userRouter.route("/getEvents").get(getPublicEvents);
+userRouter
+  .route("/getProductHuntPostsPublicApi/:topic")
+  .get(getProductHuntPosts);
+userRouter.route("/perplexityNewsPublicApi").post(perplexityApi);
+userRouter.route("/getEventsPublicApi").get(getPublicEvents);

@@ -22,6 +22,7 @@ import {
   getMatchingGmail,
   getMatchingReplyGmail,
   getReplyGmailDraftFieldsUsingLLM,
+  getPreferencesSummary,
 } from "../utils/chatgptFuncs";
 import {
   getConversations,
@@ -1064,7 +1065,7 @@ export const getStaticData: RequestHandler = async (
   }
 };
 
-export const addUserDetails: RequestHandler = async (
+export const addPreferences: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -1072,11 +1073,177 @@ export const addUserDetails: RequestHandler = async (
   try {
     const { prompt }: { prompt: string } = req.body;
 
-    console.log(prompt);
+    if (!prompt || !prompt.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { preferences: prompt, preferences_added: true },
+    });
 
     return res
       .status(200)
       .json({ success: true, message: "Got the user preferences" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const updatePreferences: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { prompt }: { prompt: string } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const summary = await getPreferencesSummary(user.preferences, prompt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { preferences: summary },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Update the user preferences" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const getPreferences: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    return res.status(200).json({ success: true, message: user.preferences });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const updateMorningUpdateCheck: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { morning_update_check: true },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "User recieved the morning feedback" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const updateUserPreferences: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { prompt }: { prompt: string } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { preferences: prompt },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Update the user preferences" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const addMorningPreferences: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { prompt }: { prompt: string } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { morning_update_preferences: prompt },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Update the user morning preferences" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

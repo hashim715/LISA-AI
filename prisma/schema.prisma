@@ -39,4 +39,9 @@ model User {
   slack_user_id String?
   slack_bot_id String?
   expiresAt String?
+  preferences String?
+  preferences_added Boolean @default(false)
+  morning_update String?
+  morning_update_check Boolean @default(false)
+  morning_update_preferences String?
 }

@@ -17,7 +17,12 @@ import {
   draftGoogleGmail,
   draftGoogleGmailReply,
   getStaticData,
-  addUserDetails,
+  addPreferences,
+  updatePreferences,
+  getPreferences,
+  updateMorningUpdateCheck,
+  updateUserPreferences,
+  addMorningPreferences,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -55,12 +60,18 @@ userRouter
 userRouter.route("/perplexityNews").post(protectAgent, perplexityApi);
 userRouter.route("/getUnreadMessages").post(protectAgent, getUnreadMessages);
 userRouter.route("/sendMessage").post(protectAgent, sendMessage);
+userRouter.route("/addUserPreferences").post(protectAgent, addPreferences);
+userRouter.route("/updatePreferences").post(protectAgent, updatePreferences);
+userRouter.route("/getPreferences").post(protectAgent, getPreferences);
 userRouter
-  .route("/getAuthorizedUrl")
-  .get(protect, refreshAccessToken, getAuthorizedUrl);
-userRouter.route("/addUserPreferences").post(protectAgent, addUserDetails);
+  .route("/updateMorningCheck")
+  .post(protectAgent, updateMorningUpdateCheck);
 userRouter
   .route("/refreshAccessTokens")
   .get(protect, refreshAccessToken, refreshAccessTokenController);
-
+userRouter
+  .route("/getAuthorizedUrl")
+  .get(protect, refreshAccessToken, getAuthorizedUrl);
+userRouter.route("/updateUserPreferences").post(protect, updateUserPreferences);
+userRouter.route("/addMorningPreferences").post(protect, addMorningPreferences);
 userRouter.route("/getStaticData").get(getStaticData);

@@ -280,3 +280,32 @@ export const getMatchingReplyGmail = async (
     return null;
   }
 };
+
+export const getPreferencesSummary = async (
+  old_preference: string,
+  new_preference: string
+) => {
+  try {
+    const prompt = `
+    You are given the new preferences and old preferences generate a summary of these:
+      Old Preference: "${old_preference}"
+      New Preference: "${new_preference}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+  }
+};

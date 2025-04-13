@@ -262,3 +262,249 @@ export const getOutlookEmailsFromSpecificSender = async (
     return null;
   }
 };
+
+export const addOutlookCalendarEvent = async (
+  access_token: string,
+  subject: string,
+  description: string,
+  location: string,
+  start: any,
+  end: any,
+  attendees: any
+) => {
+  try {
+    const response = await axios.post(
+      "https://graph.microsoft.com/v1.0/me/events",
+      {
+        subject: subject,
+        body: {
+          contentType: "Text",
+          content: description,
+        },
+        start: start,
+        end: end,
+        location: location,
+        attendees: attendees,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (err) {
+    console.log(
+      "get outlook emails using search query error:",
+      err.response?.data || err.message || err
+    );
+    return null;
+  }
+};
+
+export const createOutlookMailDraft = async (
+  access_token: string,
+  reciever_email: string,
+  subject: string,
+  bodyContent: string
+) => {
+  try {
+    const response = await axios.post(
+      "https://graph.microsoft.com/v1.0/me/messages",
+      {
+        subject: subject,
+        body: {
+          contentType: "Text",
+          content: bodyContent,
+        },
+        toRecipients: [
+          {
+            emailAddress: {
+              address: reciever_email,
+            },
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (err) {
+    console.log(
+      "get outlook emails using search query error:",
+      err.response?.data || err.message || err
+    );
+    return null;
+  }
+};
+
+export const createOutlookReplyDraft = async (
+  messageId: string,
+  bodyContent: string,
+  access_token: string
+) => {
+  try {
+    const reply = await axios.post(
+      `https://graph.microsoft.com/v1.0/me/messages/${messageId}/createReply`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const replyDraftId = reply.data.id;
+
+    const response = await axios.patch(
+      `https://graph.microsoft.com/v1.0/me/messages/${replyDraftId}`,
+      {
+        body: {
+          contentType: "Text",
+          content: bodyContent,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (err) {
+    console.log(
+      "get outlook emails using search query error:",
+      err.response?.data || err.message || err
+    );
+    return null;
+  }
+};
+
+export const getReplySenderOutlookEmailsUsingSearchQuery = async (
+  access_token: string,
+  searchName: string
+): Promise<null | any> => {
+  try {
+    const last24HoursISO = new Date(
+      Date.now() - 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const inboxResponse = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const inboxFolderId = inboxResponse.data.id;
+
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and (contains(from/emailAddress/address, '${encodeURIComponent(
+      searchName
+    )}') or contains(subject, '${encodeURIComponent(
+      searchName
+    )}') or contains(body/content, '${encodeURIComponent(
+      searchName
+    )}')) and receivedDateTime ge ${last24HoursISO}&$top=10&$select=id,subject,from,receivedDateTime,body`;
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    let outlookUnreadEmails: Array<any> = [];
+
+    const outlookemails = response.data.value;
+    if (outlookemails.length === 0) {
+      return [];
+    }
+
+    outlookemails.forEach((email: any) => {
+      outlookUnreadEmails.push({
+        id: email.id,
+        from: email.from.emailAddress.name,
+      });
+    });
+
+    return outlookUnreadEmails;
+  } catch (err) {
+    console.log(
+      "get outlook emails using search query error:",
+      err.response?.data || err.message || err
+    );
+    return null;
+  }
+};
+
+export const getSenderOutlookEmailsUsingSearchQuery = async (
+  access_token: string,
+  searchName: string
+): Promise<null | any> => {
+  try {
+    const last24HoursISO = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const inboxResponse = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const inboxFolderId = inboxResponse.data.id;
+
+    const apiUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${inboxFolderId}/messages?$filter=inferenceClassification eq 'focused' and (contains(from/emailAddress/address, '${encodeURIComponent(
+      searchName
+    )}') or contains(subject, '${encodeURIComponent(
+      searchName
+    )}') or contains(body/content, '${encodeURIComponent(
+      searchName
+    )}')) and receivedDateTime ge ${last24HoursISO}&$top=10&$select=subject,from,receivedDateTime,body`;
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    let outlookUnreadEmails: Array<any> = [];
+
+    const outlookemails = response.data.value;
+    if (outlookemails.length === 0) {
+      return [];
+    }
+
+    outlookemails.forEach((email: any) => {
+      outlookUnreadEmails.push({
+        from: email.from.emailAddress.name,
+      });
+    });
+
+    return outlookUnreadEmails;
+  } catch (err) {
+    console.log(
+      "get outlook emails using search query error:",
+      err.response?.data || err.message || err
+    );
+    return null;
+  }
+};

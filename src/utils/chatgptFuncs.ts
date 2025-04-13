@@ -309,3 +309,153 @@ export const getPreferencesSummary = async (
     console.log(err);
   }
 };
+
+export const getOutlookCalenderFieldsUsingLLM = async (
+  input: string,
+  today_date: string
+) => {
+  try {
+    const prompt = `
+      Extract event details from this user instruction and return it as a JSON object with keys:
+      - subject
+      - body {contentType: "Text", content: description}
+      - location { displayName: location},
+      - start: { dateTime, timeZone }
+      - end: { dateTime, timeZone }
+      - attendees (optional): array of attendies like [name]
+
+      Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies 	for my startup. Keep it an hour long. 
+
+      Get the timezone according to location and if it is not there then keep it in pacific time. if timezone is mentioned explicitly then use that one.
+
+      Today’s date is: “${today_date}”
+
+      Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract calendar event information from user instructions.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getOutlookDraftFieldsUsingLLM = async (input: string) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - name
+    - subject
+    - bodyContent
+
+      Example: 
+      Instruction: Write an email to Sam how the presentation went. 
+      -name : shahbaz
+      -subject: Presentation update
+      -bodyContent: Hey Shahbaz, how did the presentation go?
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getReplyOutlookDraftFieldsUsingLLM = async (input: string) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - name
+    - bodyContent
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getMatchingReplyOutlookMail = async (
+  input: string,
+  emailList: Array<any>
+) => {
+  try {
+    const prompt = `
+    Extract the following fields from the instruction and return a JSON object:
+    - from use email list provided to find a matching email by the name that is provided you in prompt if email is not found then return null.
+    - messageId
+
+    Available emails:
+    ${JSON.stringify(emailList)}
+    
+    Instruction: "${input}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract email fields from user instructions for creating Gmail drafts.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};

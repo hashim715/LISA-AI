@@ -13,9 +13,9 @@ import {
   sendMessage,
   getAuthorizedUrl,
   refreshAccessTokenController,
-  addGoogleCalenderEvent,
-  draftGoogleGmail,
-  draftGoogleGmailReply,
+  addCalenderEvent,
+  draftEmail,
+  drafteEmailReply,
   getStaticData,
   addPreferences,
   updatePreferences,
@@ -43,13 +43,13 @@ userRouter
   .post(protectAgent, refreshAccessToken, getEmailsUsingSearchQuery);
 userRouter
   .route("/addGoogleCalenderEvent")
-  .post(protectAgent, refreshAccessToken, addGoogleCalenderEvent);
+  .post(protectAgent, refreshAccessToken, addCalenderEvent);
 userRouter
   .route("/draftGoogleGmail")
-  .post(protectAgent, refreshAccessToken, draftGoogleGmail);
+  .post(protectAgent, refreshAccessToken, draftEmail);
 userRouter
   .route("/draftReplyGoogleGmail")
-  .post(protectAgent, refreshAccessToken, draftGoogleGmailReply);
+  .post(protectAgent, refreshAccessToken, drafteEmailReply);
 userRouter.route("/getCurrentDateTime").get(getCurrentDateTime);
 userRouter.route("/notionData").post(protectAgent, notionDataApi);
 userRouter

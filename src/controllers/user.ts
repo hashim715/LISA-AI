@@ -17,11 +17,6 @@ import {
 import {
   getChannelNameUsingLLM,
   summarizeNotionWithLLM,
-  getGoogleCalenderFieldsUsingLLM,
-  getGmailDraftFieldsUsingLLM,
-  getMatchingGmail,
-  getMatchingReplyGmail,
-  getReplyGmailDraftFieldsUsingLLM,
   getPreferencesSummary,
 } from "../utils/chatgptFuncs";
 import {
@@ -36,17 +31,20 @@ import {
   getGoogleEmails,
   getGoogleCalenderEvents,
   getGoogleEmailsFromSpecificSender,
-  addGoogleCalenderEventFunc,
-  createGmailDraft,
-  getSenderEmailsUsingSearchQuery,
-  createGmailReplyDraft,
-  getReplySenderEmailsUsingSearchQuery,
 } from "../utils/gmailApi";
 import {
   getOutlookEmails,
   getOutlookCalenderEvents,
   getOutlookEmailsFromSpecificSender,
 } from "../utils/outlookApi";
+import {
+  addGoogleCalenderFunc,
+  addOutlookCalenderFunc,
+  draftGoogleGmailFunc,
+  draftOutlookMailFunc,
+  draftGoogleGmailReplyFunc,
+  draftOutlookMailReplyFunc,
+} from "../utils/controllerFuncs";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -708,15 +706,15 @@ export const refreshAccessTokenController: RequestHandler = async (
   }
 };
 
-export const addGoogleCalenderEvent: RequestHandler = async (
+export const addCalenderEvent: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { text }: { text: string } = req.body;
+    const { text, type }: { text: string; type: string } = req.body;
 
-    if (!text || !text.trim()) {
+    if (!text || !text.trim() || !type || !type.trim()) {
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
@@ -726,82 +724,41 @@ export const addGoogleCalenderEvent: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    if (!user.google_login) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User is not connected to google" });
-    }
+    if (type === "google") {
+      if (user.google_login) {
+        const data = await addGoogleCalenderFunc(res, text, user);
 
-    const processedInput = await getGoogleCalenderFieldsUsingLLM(
-      text,
-      new Date().toISOString()
-    );
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Calender not added" });
+        }
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: "User is not connected to google" });
+      }
+    } else if (type === "outlook") {
+      if (user.outlook_login) {
+        const data = await addOutlookCalenderFunc(text, res, user);
 
-    if (!processedInput) {
-      return badRequestResponse(res, "Please provide valid input");
-    }
-
-    const {
-      summary,
-      description,
-      location,
-      start,
-      end,
-      attendees,
-    }: {
-      summary: string;
-      description: string;
-      location: string;
-      start: any;
-      end: any;
-      attendees: any;
-    } = JSON.parse(processedInput);
-
-    let emailArray = [];
-
-    for (const name of attendees) {
-      const emailMetaData = await getSenderEmailsUsingSearchQuery(
-        name,
-        user.google_access_token
-      );
-
-      const processedSearchQueryEmail = await getMatchingGmail(
-        name,
-        emailMetaData
-      );
-
-      const { from }: { from: string } = JSON.parse(processedSearchQueryEmail);
-
-      if (from) {
-        emailArray.push({ email: from });
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Calender not added" });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "User is not connected to outlook",
+        });
       }
     }
 
-    emailArray = emailArray.filter(
-      (email) => email.email !== "name@example.com"
-    );
-
-    console.log(emailArray);
-
-    const data = await addGoogleCalenderEventFunc(
-      user.google_access_token,
-      summary,
-      description,
-      location,
-      start,
-      end,
-      emailArray
-    );
-
-    if (!data) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "could not add calender event can you please try again may be something wrong with the input you provided",
-      });
-    }
-
-    return res.status(200).json({ success: true, message: data });
+    return res.status(200).json({
+      success: true,
+      message: "Event added in your calender successfully",
+    });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -810,15 +767,15 @@ export const addGoogleCalenderEvent: RequestHandler = async (
   }
 };
 
-export const draftGoogleGmail: RequestHandler = async (
+export const draftEmail: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { text }: { text: string } = req.body;
+    const { text, type }: { text: string; type: string } = req.body;
 
-    if (!text || !text.trim()) {
+    if (!text || !text.trim() || !type || !type.trim()) {
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
@@ -828,82 +785,35 @@ export const draftGoogleGmail: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    if (!user.google_login) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User is not connected to google" });
-    }
+    if (type === "google") {
+      if (user.google_login) {
+        const data = await draftGoogleGmailFunc(text, res, user);
 
-    const processedInput = await getGmailDraftFieldsUsingLLM(text);
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "email not sent" });
+        }
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: "User is not connected to google" });
+      }
+    } else if (type === "outlook") {
+      if (user.outlook_login) {
+        const data = await draftOutlookMailFunc(text, res, user);
 
-    if (!processedInput) {
-      return badRequestResponse(res, "Please provide valid input");
-    }
-
-    console.log(processedInput);
-
-    const {
-      name,
-      bodyContent,
-      subject,
-    }: {
-      name: string;
-      bodyContent: string;
-      subject: string;
-    } = JSON.parse(processedInput);
-
-    if (!name || !name.trim() || !bodyContent || !bodyContent.trim()) {
-      return badRequestResponse(
-        res,
-        "Ask the user to tell name,body,subject correctly one of the field is not specified correctly"
-      );
-    }
-
-    const emailMetaData = await getSenderEmailsUsingSearchQuery(
-      name,
-      user.google_access_token
-    );
-
-    console.log(emailMetaData);
-
-    const processedSearchQueryEmail = await getMatchingGmail(
-      name,
-      emailMetaData
-    );
-
-    if (!processedSearchQueryEmail) {
-      return badRequestResponse(
-        res,
-        "Could not find emails for the given name"
-      );
-    }
-
-    console.log(processedSearchQueryEmail);
-
-    const { from }: { from: string } = JSON.parse(processedSearchQueryEmail);
-
-    if (!from || !from.trim()) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Tell the user i tried to find the reciever email couldn't find it so please specify exactly to whon to send this email",
-      });
-    }
-
-    const data = await createGmailDraft(
-      user.google_access_token,
-      user.google_email,
-      from,
-      user.name,
-      subject,
-      bodyContent
-    );
-
-    if (!data) {
-      return res.status(400).json({
-        success: false,
-        message: "could not draft email please try again",
-      });
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "email not sent" });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "User is not connected to outlook",
+        });
+      }
     }
 
     return res
@@ -917,15 +827,15 @@ export const draftGoogleGmail: RequestHandler = async (
   }
 };
 
-export const draftGoogleGmailReply: RequestHandler = async (
+export const drafteEmailReply: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { text }: { text: string } = req.body;
+    const { text, type }: { text: string; type: string } = req.body;
 
-    if (!text || !text.trim()) {
+    if (!text || !text.trim() || !type || !type.trim()) {
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
@@ -941,93 +851,35 @@ export const draftGoogleGmailReply: RequestHandler = async (
         .json({ success: false, message: "User is not connected to google" });
     }
 
-    const processedInput = await getReplyGmailDraftFieldsUsingLLM(text);
+    if (type === "google") {
+      if (user.google_login) {
+        const data = await draftGoogleGmailReplyFunc(text, res, user);
 
-    if (!processedInput) {
-      return badRequestResponse(res, "please provide valid input");
-    }
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "email not sent" });
+        }
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: "User is not connected to google" });
+      }
+    } else if (type === "outlook") {
+      if (user.outlook_login) {
+        const data = await draftOutlookMailReplyFunc(text, res, user);
 
-    console.log(processedInput);
-
-    const {
-      name,
-      bodyContent,
-    }: {
-      name: string;
-      bodyContent: string;
-    } = JSON.parse(processedInput);
-
-    if (!name || !name.trim() || !bodyContent || !bodyContent.trim()) {
-      return badRequestResponse(
-        res,
-        "Ask the user to tell name,body correctly one of the field is not specified correctly"
-      );
-    }
-
-    const replyEmailMetaData = await getReplySenderEmailsUsingSearchQuery(
-      name,
-      user.google_access_token
-    );
-
-    if (!replyEmailMetaData || replyEmailMetaData.length === 0) {
-      return badRequestResponse(
-        res,
-        "Could not find emails for the given name"
-      );
-    }
-
-    const processedSearchQueryEmail = await getMatchingReplyGmail(
-      name,
-      replyEmailMetaData
-    );
-
-    if (!processedSearchQueryEmail) {
-      return badRequestResponse(
-        res,
-        "Could not find emails for the given name"
-      );
-    }
-
-    console.log(processedSearchQueryEmail);
-
-    const {
-      messageId,
-      threadId,
-      subject,
-      from,
-    }: { messageId: string; threadId: string; subject: string; from: string } =
-      JSON.parse(processedSearchQueryEmail);
-
-    if (
-      !messageId ||
-      !messageId.trim() ||
-      !threadId ||
-      !threadId.trim() ||
-      !from ||
-      !from.trim()
-    ) {
-      return badRequestResponse(
-        res,
-        "Tell the user i tried to find the reciever email couldn't find it so please specify exactly to whom to reply"
-      );
-    }
-
-    const data = await createGmailReplyDraft(
-      user.google_access_token,
-      user.google_email,
-      from,
-      user.name,
-      subject,
-      bodyContent,
-      threadId,
-      messageId
-    );
-
-    if (!data) {
-      return badRequestResponse(
-        res,
-        "could not create draft reply email try again with valid inputs"
-      );
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "email not sent" });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "User is not connected to outlook",
+        });
+      }
     }
 
     return res
@@ -1263,7 +1115,9 @@ export const getPublicEvents: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    return res.status(200).json({ success: true, message: "Events" });
+    const events = await prisma.events.findMany({});
+
+    return res.status(200).json({ success: true, message: events });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

@@ -184,7 +184,7 @@ export const scheduleUserBriefs = async () => {
     const users = await prisma.user.findMany({});
     console.log(`Scheduling briefs for ${users.length} users`);
 
-    users.forEach((user) => {
+    users.forEach((user: any) => {
       if (user.morning_brief_time) {
         const cronExpression = getPrepCronExpression(user.morning_brief_time);
         console.log(`Scheduling brief for ${user.name} at ${cronExpression}`);

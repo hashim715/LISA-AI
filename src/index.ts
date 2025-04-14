@@ -58,10 +58,8 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     .json({ success: false, message: "Something went wrong try again.." });
 });
 
-// app.use("/v1/testing", testingRouter);
 app.use("/v1/auth", authRouter);
 app.use("/v1/user", userRouter);
-// app.use("/v1/testingUser", testingUserRouter);
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) {
@@ -168,11 +166,13 @@ const prepareMorningBrief = async (user: any) => {
       },
     });
 
-    const message = await twilio_client.messages.create({
-      body: `Your morning brief is ready`,
-      from: process.env.TWILIO_ACCOUNT_PHONE_NUMBER,
-      to: user.phone_number,
-    });
+    if (user.phone_number) {
+      const message = await twilio_client.messages.create({
+        body: `Your morning brief is ready`,
+        from: process.env.TWILIO_ACCOUNT_PHONE_NUMBER,
+        to: user.phone_number,
+      });
+    }
   } catch (err) {
     console.log(err);
   }

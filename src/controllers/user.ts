@@ -46,6 +46,7 @@ import {
   draftOutlookMailReplyFunc,
 } from "../utils/controllerFuncs";
 import { scheduleUserBriefs } from "../index";
+import { validatePhoneNumber } from "../utils/validatePhoneNumber";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -1202,11 +1203,60 @@ export const addUserDetails: RequestHandler = async (
 ) => {
   try {
     const {
-      phone_number,
       company_name,
       position,
-    }: { phone_number: string; company_name: string; position: string } =
-      req.body;
+    }: { company_name: string; position: string } = req.body;
+
+    if (
+      !company_name ||
+      !company_name.trim() ||
+      !position ||
+      !position.trim()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide valid inputs" });
+    }
+
+    let { phone_number }: { phone_number: string } = req.body;
+
+    if (!phone_number.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide valid inputs" });
+    }
+
+    if (!phone_number.startsWith("+1")) {
+      phone_number = phone_number.startsWith("1")
+        ? "+" + phone_number
+        : "+1" + phone_number;
+    }
+
+    if (!validatePhoneNumber(phone_number)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number that you provided is not valid",
+      });
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        phone_number: phone_number,
+        company_name: company_name,
+        position: position,
+      },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "User details added successfully" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

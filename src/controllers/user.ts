@@ -740,6 +740,8 @@ export const addCalenderEvent: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
+    console.log(text, type);
+
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);
@@ -801,6 +803,8 @@ export const draftEmail: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
+    console.log(text, type);
+
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);
@@ -860,6 +864,8 @@ export const drafteEmailReply: RequestHandler = async (
     if (!text || !text.trim() || !type || !type.trim()) {
       return badRequestResponse(res, "Please provide valid inputs");
     }
+
+    console.log(text, type);
 
     const token = req.cookies.authToken;
 

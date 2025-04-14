@@ -811,7 +811,7 @@ export const draftEmail: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    if (type === "google") {
+    if (type === "gmail") {
       if (user.google_login) {
         const data = await draftGoogleGmailFunc(text, res, user);
 

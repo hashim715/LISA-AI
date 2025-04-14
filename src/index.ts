@@ -100,6 +100,8 @@ const prepareMorningBrief = async (user: any) => {
     let google_calender_events: Array<any> = [];
     let outlook_calender_events: Array<any> = [];
 
+    await refreshAccessTokensFunc(user.token);
+
     if (user.google_login) {
       google_emails = await getGoogleEmails(user.google_access_token);
     }
@@ -193,7 +195,6 @@ export const scheduleUserBriefs = async () => {
         cron.schedule(
           cronExpression,
           () => {
-            refreshAccessTokensFunc(user.token);
             prepareMorningBrief(user);
           },
           {

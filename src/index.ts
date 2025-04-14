@@ -80,7 +80,6 @@ const server: http.Server = http.createServer(app);
 
 const getPrepCronExpression = (briefTime: string) => {
   const [hours, minutes] = briefTime.split(" ")[0].split(":").map(Number);
-  console.log(hours, minutes);
   let prepMinutes = minutes - 10;
   let prepHours = hours;
 

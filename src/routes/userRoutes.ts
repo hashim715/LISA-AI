@@ -24,6 +24,8 @@ import {
   updateUserPreferences,
   addMorningPreferences,
   getPublicEvents,
+  addEvent,
+  addUserDetails,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -75,9 +77,11 @@ userRouter
   .get(protect, refreshAccessToken, getAuthorizedUrl);
 userRouter.route("/updateUserPreferences").post(protect, updateUserPreferences);
 userRouter.route("/addMorningPreferences").post(protect, addMorningPreferences);
+userRouter.route("/addUserDetails").post(protect, addUserDetails);
 userRouter.route("/getStaticData").get(getStaticData);
 userRouter
   .route("/getProductHuntPostsPublicApi/:topic")
   .get(getProductHuntPosts);
 userRouter.route("/perplexityNewsPublicApi").post(perplexityApi);
 userRouter.route("/getEventsPublicApi").get(getPublicEvents);
+userRouter.route("/addEvent").post(addEvent);

@@ -12,7 +12,7 @@ import axios from "axios";
 
 dotenv.config();
 
-const refreshGoogleAccessToken = async (
+export const refreshGoogleAccessToken = async (
   refresh_token: string
 ): Promise<null | any> => {
   try {
@@ -37,7 +37,7 @@ const refreshGoogleAccessToken = async (
   }
 };
 
-const refreshOutlookAccessToken = async (
+export const refreshOutlookAccessToken = async (
   refresh_token: string
 ): Promise<null | any> => {
   try {

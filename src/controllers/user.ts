@@ -45,6 +45,7 @@ import {
   draftGoogleGmailReplyFunc,
   draftOutlookMailReplyFunc,
 } from "../utils/controllerFuncs";
+import { scheduleUserBriefs } from "../index";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -373,6 +374,17 @@ export const getMorningUpdate: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
+    if (user.morning_update) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { morning_update_check: true },
+      });
+
+      return res
+        .status(200)
+        .json({ success: true, message: JSON.parse(user.morning_update) });
+    }
+
     let google_emails: Array<any> = [];
     let outlook_emails: Array<any> = [];
 
@@ -433,7 +445,16 @@ export const getMorningUpdate: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { morning_update_check: true },
+      data: {
+        morning_update_check: true,
+        morning_update: JSON.stringify({
+          notion_summary: notion_summary,
+          google_calender_events: google_calender_events,
+          outlook_calender_events: outlook_calender_events,
+          google_emails: google_emails,
+          outlook_emails: outlook_emails,
+        }),
+      },
     });
 
     return res.status(200).json({
@@ -845,12 +866,6 @@ export const drafteEmailReply: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    if (!user.google_login) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User is not connected to google" });
-    }
-
     if (type === "google") {
       if (user.google_login) {
         const data = await draftGoogleGmailReplyFunc(text, res, user);
@@ -930,10 +945,6 @@ export const addPreferences: RequestHandler = async (
   try {
     const { prompt }: { prompt: string } = req.body;
 
-    if (!prompt || !prompt.trim()) {
-      return badRequestResponse(res, "Please provide valid inputs");
-    }
-
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);
@@ -942,7 +953,10 @@ export const addPreferences: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { preferences: prompt, preferences_added: true },
+      data: {
+        preferences: prompt,
+        preferences_added: prompt.length > 0 ? true : false,
+      },
     });
 
     return res
@@ -964,10 +978,6 @@ export const updatePreferences: RequestHandler = async (
   try {
     const { prompt }: { prompt: string } = req.body;
 
-    if (!prompt || !prompt.trim()) {
-      return badRequestResponse(res, "Please provide valid inputs");
-    }
-
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);
@@ -978,7 +988,10 @@ export const updatePreferences: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { preferences: summary, preferences_added: true },
+      data: {
+        preferences: prompt.length > 0 ? summary : prompt,
+        preferences_added: prompt.length > 0 ? true : false,
+      },
     });
 
     return res
@@ -1049,10 +1062,6 @@ export const updateUserPreferences: RequestHandler = async (
   try {
     const { prompt }: { prompt: string } = req.body;
 
-    if (!prompt || !prompt.trim()) {
-      return badRequestResponse(res, "Please provide valid inputs");
-    }
-
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);
@@ -1061,7 +1070,10 @@ export const updateUserPreferences: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { preferences: prompt, preferences_added: true },
+      data: {
+        preferences: prompt,
+        preferences_added: prompt.length > 0 ? true : false,
+      },
     });
 
     return res
@@ -1081,10 +1093,27 @@ export const addMorningPreferences: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { prompt }: { prompt: string } = req.body;
+    const {
+      prompt,
+      morningBriefTime,
+      timezone,
+    }: { prompt: string; morningBriefTime: string; timezone: string } =
+      req.body;
 
-    if (!prompt || !prompt.trim()) {
+    if (
+      !morningBriefTime ||
+      !morningBriefTime.trim() ||
+      !timezone ||
+      !timezone.trim()
+    ) {
       return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    if (!/^(1[0-2]|0?[1-9]):[0-5][0-9]\s?(AM|PM)$/i.test(morningBriefTime)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid time format. Use HH:MM AM/PM",
+      });
     }
 
     const token = req.cookies.authToken;
@@ -1095,12 +1124,18 @@ export const addMorningPreferences: RequestHandler = async (
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { morning_update_preferences: prompt },
+      data: {
+        morning_update_preferences: prompt,
+        morning_brief_time: morningBriefTime,
+        timeZone: timezone,
+      },
     });
 
-    return res
+    res
       .status(200)
       .json({ success: true, message: "Update the user morning preferences" });
+
+    scheduleUserBriefs();
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -1118,6 +1153,60 @@ export const getPublicEvents: RequestHandler = async (
     const events = await prisma.events.findMany({});
 
     return res.status(200).json({ success: true, message: events });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const addEvent: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { text }: { text: string } = req.body;
+
+    if (!text || !text.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide valid inputs" });
+    }
+
+    let events = await prisma.events.findMany({});
+
+    if (events.length > 0) {
+      await prisma.events.update({
+        where: { id: events[0].id },
+        data: { events: text },
+      });
+    }
+
+    await prisma.events.create({ data: { events: text } });
+
+    return res.status(200).json({ success: true, message: "Created event" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const addUserDetails: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const {
+      phone_number,
+      company_name,
+      position,
+    }: { phone_number: string; company_name: string; position: string } =
+      req.body;
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

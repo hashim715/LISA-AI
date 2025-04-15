@@ -34,7 +34,24 @@ app.use(cookieParser());
 // Trust first proxy (e.g., NGINX, AWS Load Balancer, Cloudflare)
 app.set("trust proxy", 1);
 app.use(helmet()); // Sets HTTP security headers
-app.use(cors({ origin: "*", credentials: true }));
+const allowedOrigins = ["http://localhost:5173", "https://ourlisa.com"];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 

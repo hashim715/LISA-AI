@@ -34,7 +34,7 @@ app.use(cookieParser());
 // Trust first proxy (e.g., NGINX, AWS Load Balancer, Cloudflare)
 app.set("trust proxy", 1);
 app.use(helmet()); // Sets HTTP security headers
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: "*", credentials: true }));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 

@@ -34,7 +34,11 @@ app.use(cookieParser());
 // Trust first proxy (e.g., NGINX, AWS Load Balancer, Cloudflare)
 app.set("trust proxy", 1);
 app.use(helmet()); // Sets HTTP security headers
-const allowedOrigins = ["http://localhost:5173", "https://ourlisa.com"];
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://ourlisa.com",
+  "https://www.ourlisa.com",
+];
 
 app.use(
   cors({

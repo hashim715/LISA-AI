@@ -523,6 +523,7 @@ export const getMorningUpdate: RequestHandler = async (
       slack_unread_messages: all_unread_messages,
     });
   } catch (err) {
+    console.log(err);
     if (!res.headersSent) {
       return internalServerError(res);
     }

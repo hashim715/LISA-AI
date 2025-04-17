@@ -618,9 +618,13 @@ export const integrateslackAccount: RequestHandler = async (
   try {
     const { code }: { code: string } = req.body;
 
+    console.log(code);
+
     if (!code.trim()) {
       return unauthorizedErrorResponse(res);
     }
+
+    console.log(code);
 
     const response = await axios.post(
       "https://slack.com/api/oauth.v2.access",

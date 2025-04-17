@@ -645,10 +645,10 @@ export const integrateslackAccount: RequestHandler = async (
     console.log(response.data);
     console.log(response.data.message);
 
-    const user_access_token = response.data.message.authed_user.access_token;
-    const user_id = response.data.message.authed_user.id;
-    const bot_access_token = response.data.message.access_token;
-    const bot_id = response.data.message.bot_user_id;
+    const user_access_token = response.data.authed_user.access_token;
+    const user_id = response.data.authed_user.id;
+    const bot_access_token = response.data.access_token;
+    const bot_id = response.data.bot_user_id;
 
     await prisma.user.update({
       where: { id: user.id },

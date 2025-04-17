@@ -642,6 +642,9 @@ export const integrateslackAccount: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
+    console.log(response.data);
+    console.log(response.data.message);
+
     const user_access_token = response.data.message.authed_user.access_token;
     const user_id = response.data.message.authed_user.id;
     const bot_access_token = response.data.message.access_token;

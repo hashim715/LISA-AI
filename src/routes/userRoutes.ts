@@ -26,6 +26,7 @@ import {
   getPublicEvents,
   addEvent,
   addUserDetails,
+  addPhoneNumber,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -78,6 +79,7 @@ userRouter
 userRouter.route("/updateUserPreferences").post(protect, updateUserPreferences);
 userRouter.route("/addMorningPreferences").post(protect, addMorningPreferences);
 userRouter.route("/addUserDetails").post(protect, addUserDetails);
+userRouter.route("/addPhoneNumber").post(protect, addPhoneNumber);
 userRouter.route("/getStaticData").get(getStaticData);
 userRouter
   .route("/getProductHuntPostsPublicApi/:topic")

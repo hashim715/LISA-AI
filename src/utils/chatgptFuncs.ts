@@ -106,9 +106,13 @@ export const getGoogleCalenderFieldsUsingLLM = async (
       - end: { dateTime, timeZone }
       - attendees (optional): array of attendies like [name]
 
-      Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies 	for my startup. Keep it an hour long. 
+      Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies for my startup. Keep it an hour long.
 
-      Get the timezone according to location and if it is not there then keep it in pacific time. if timezone is mentioned explicitly then use that one.
+      Determine the appropriate timezone based on the user’s location.
+
+      If a timezone is explicitly mentioned, use that.
+      If no timezone is mentioned but a location is provided, infer the timezone from the location.
+      If neither a timezone nor a location is given, default to America/Los_Angeles.
 
       Today’s date is: “${today_date}”
 
@@ -326,7 +330,11 @@ export const getOutlookCalenderFieldsUsingLLM = async (
 
       Example Instruction would be like: Set a meeting at 3pm at Y-	Combinator building with Sam Altman to discuss funding strategies 	for my startup. Keep it an hour long. 
 
-      Get the timezone according to location and if it is not there then keep it in pacific time. if timezone is mentioned explicitly then use that one.
+      Determine the appropriate timezone based on the user’s location.
+
+      If a timezone is explicitly mentioned, use that.
+      If no timezone is mentioned but a location is provided, infer the timezone from the location.
+      If neither a timezone nor a location is given, default to America/Los_Angeles.
 
       Today’s date is: “${today_date}”
 

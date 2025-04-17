@@ -610,15 +610,13 @@ export const slackAuth: RequestHandler = async (
   }
 };
 
-export const slackredirectauth: RequestHandler = async (
+export const integrateslackAccount: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    let { code } = req.query;
-
-    code = code.toString();
+    const { code }: { code: string } = req.body;
 
     if (!code.trim()) {
       return unauthorizedErrorResponse(res);
@@ -638,7 +636,30 @@ export const slackredirectauth: RequestHandler = async (
       }
     );
 
-    return res.status(200).json({ success: true, message: response.data });
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const user_access_token = response.data.message.authed_user.access_token;
+    const user_id = response.data.message.authed_user.id;
+    const bot_access_token = response.data.message.access_token;
+    const bot_id = response.data.message.bot_user_id;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        slack_user_access_token: user_access_token,
+        slack_bot_access_token: bot_access_token,
+        slack_user_id: user_id,
+        slack_bot_id: bot_id,
+      },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Connected successfully" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

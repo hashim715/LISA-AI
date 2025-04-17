@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "message": {
+    "ok": true,
+    "app_id": "A08LKAC7N8H",
+    "authed_user": {
+      "id": "U08L8A9R935",
+      "scope": "channels:history,groups:history,im:history,mpim:history,channels:read,groups:read,im:read,users:read,users:read.email,chat:write",
+      "access_token": "xoxp-8688349815331-8688349859107-8692949525635-297aab3bad5f0b78212bde5b90d79384",
+      "token_type": "user"
+    },
+    "scope": "channels:read,channels:join,channels:manage,channels:history,groups:history,users:read,chat:write,groups:read,im:history,im:read,mpim:history,users:read.email",
+    "token_type": "bot",
+    "access_token": "xoxb-8688349815331-8691614410643-jrahYpfAkxI6nR7JKX2IoBuU",
+    "bot_user_id": "U08LBJ2C2JX",
+    "team": { "id": "T08L8A9PZ9R", "name": "Lisa" },
+    "enterprise": null,
+    "is_enterprise_install": false
+  }
+}

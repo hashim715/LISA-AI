@@ -11,7 +11,7 @@ import {
   notionAuth,
   integrateNotionAccount,
   slackAuth,
-  slackredirectauth,
+  integrateslackAccount,
 } from "../controllers/authentication";
 
 import { protect } from "../middleware/middleware";
@@ -28,4 +28,4 @@ authRouter.route("/refresh").post(refreshToken);
 authRouter.route("/notion").get(notionAuth);
 authRouter.route("/notion/callback").post(protect, integrateNotionAccount);
 authRouter.route("/slack").get(slackAuth);
-authRouter.route("/slack/callback").get(slackredirectauth);
+authRouter.route("/slack/callback").post(protect, integrateslackAccount);

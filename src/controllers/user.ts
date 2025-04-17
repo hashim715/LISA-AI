@@ -392,6 +392,8 @@ export const getMorningUpdate: RequestHandler = async (
     let google_calender_events: Array<any> = [];
     let outlook_calender_events: Array<any> = [];
 
+    const all_unread_messages: Array<any> = [];
+
     if (user.google_login) {
       google_emails = await getGoogleEmails(user.google_access_token);
     }
@@ -444,6 +446,46 @@ export const getMorningUpdate: RequestHandler = async (
       console.log("\nDone generating summary...");
     }
 
+    if (user.slack_login) {
+      const conversations = await getConversations(
+        user.slack_user_access_token
+      );
+
+      if (conversations) {
+        for (const channel of conversations.channels) {
+          const isDM = channel.is_im;
+
+          const last_read_timestamp = await getLastReadTimestamp(
+            channel.id,
+            user.slack_user_access_token
+          );
+
+          if (last_read_timestamp) {
+            const unread_messages = await getUnreadMessagesFunc(
+              channel.id,
+              last_read_timestamp,
+              user.slack_user_access_token
+            );
+
+            if (!unread_messages) {
+              continue;
+            }
+
+            if (unread_messages.length > 0) {
+              all_unread_messages.push({
+                channel_name: channel.name,
+                type: isDM
+                  ? "direct_message"
+                  : channel.is_private
+                  ? "private_channel"
+                  : "public_channel",
+              });
+            }
+          }
+        }
+      }
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -454,6 +496,7 @@ export const getMorningUpdate: RequestHandler = async (
           outlook_calender_events: outlook_calender_events,
           google_emails: google_emails,
           outlook_emails: outlook_emails,
+          slack_unread_messages: all_unread_messages,
         }),
       },
     });
@@ -477,6 +520,7 @@ export const getMorningUpdate: RequestHandler = async (
           ? outlook_calender_events
           : "No events in your outlook calender",
       notion_summary: notion_summary && notion_summary,
+      slack_unread_messages: all_unread_messages,
     });
   } catch (err) {
     if (!res.headersSent) {
@@ -1219,17 +1263,13 @@ export const addUserDetails: RequestHandler = async (
       !position ||
       !position.trim()
     ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide valid inputs" });
+      return badRequestResponse(res, "Please provide valid inputs");
     }
 
     let { phone_number }: { phone_number: string } = req.body;
 
     if (!phone_number.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide valid inputs" });
+      return badRequestResponse(res, "Please provide valid inputs");
     }
 
     if (!phone_number.startsWith("+1")) {
@@ -1239,10 +1279,10 @@ export const addUserDetails: RequestHandler = async (
     }
 
     if (!validatePhoneNumber(phone_number)) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number that you provided is not valid",
-      });
+      return badRequestResponse(
+        res,
+        "Phone number that you provided is not valid"
+      );
     }
 
     const token = req.cookies.authToken;
@@ -1263,6 +1303,55 @@ export const addUserDetails: RequestHandler = async (
     return res
       .status(200)
       .json({ success: true, message: "User details added successfully" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const addPhoneNumber: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    let { phone_number }: { phone_number: string } = req.body;
+
+    if (!phone_number.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    if (!phone_number.startsWith("+1")) {
+      phone_number = phone_number.startsWith("1")
+        ? "+" + phone_number
+        : "+1" + phone_number;
+    }
+
+    if (!validatePhoneNumber(phone_number)) {
+      return badRequestResponse(
+        res,
+        "Phone number that you provided is not valid"
+      );
+    }
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        phone_number: phone_number,
+      },
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "phone number added successfully" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

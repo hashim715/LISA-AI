@@ -618,13 +618,9 @@ export const integrateslackAccount: RequestHandler = async (
   try {
     const { code }: { code: string } = req.body;
 
-    console.log(code);
-
     if (!code.trim()) {
       return unauthorizedErrorResponse(res);
     }
-
-    console.log(code);
 
     const response = await axios.post(
       "https://slack.com/api/oauth.v2.access",
@@ -645,10 +641,6 @@ export const integrateslackAccount: RequestHandler = async (
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
-
-    console.log(response.data);
-    console.log(JSON.parse(response.data));
-    console.log(JSON.parse(response.data.message));
 
     const user_access_token = response.data.message.authed_user.access_token;
     const user_id = response.data.message.authed_user.id;

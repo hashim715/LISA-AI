@@ -54,7 +54,7 @@ userRouter
 userRouter
   .route("/draftReplyGoogleGmail")
   .post(protectAgent, refreshAccessToken, drafteEmailReply);
-userRouter.route("/getCurrentDateTime").post(protect, getCurrentDateTime);
+userRouter.route("/getCurrentDateTime").post(protectAgent, getCurrentDateTime);
 userRouter.route("/notionData").post(protectAgent, notionDataApi);
 userRouter
   .route("/getProductHuntPosts/:topic")

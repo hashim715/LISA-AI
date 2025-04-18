@@ -27,6 +27,7 @@ import {
   addEvent,
   addUserDetails,
   addPhoneNumber,
+  testingMessageSend,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -87,3 +88,4 @@ userRouter
 userRouter.route("/perplexityNewsPublicApi").post(perplexityApi);
 userRouter.route("/getEventsPublicApi").get(getPublicEvents);
 userRouter.route("/addEvent").post(addEvent);
+// userRouter.route("/testingSendMessage").get(testingMessageSend);

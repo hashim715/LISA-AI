@@ -47,6 +47,7 @@ import {
 } from "../utils/controllerFuncs";
 import { scheduleUserBriefs } from "../index";
 import { validatePhoneNumber } from "../utils/validatePhoneNumber";
+import { twilio_client } from "../utils/twilioClient";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -1353,6 +1354,27 @@ export const addPhoneNumber: RequestHandler = async (
     return res
       .status(200)
       .json({ success: true, message: "phone number added successfully" });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const testingMessageSend: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const message = await twilio_client.messages.create({
+      body: `Your morning brief is ready`,
+      from: process.env.TWILIO_ACCOUNT_PHONE_NUMBER,
+      to: "+13463916054",
+    });
+
+    return res.status(200).json({ success: true, message: "Message sent" });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {

@@ -48,6 +48,7 @@ import {
 import { scheduleUserBriefs } from "../index";
 import { validatePhoneNumber } from "../utils/validatePhoneNumber";
 import { twilio_client } from "../utils/twilioClient";
+import { DateTime } from "luxon";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -229,10 +230,15 @@ export const getCurrentDateTime: RequestHandler = async (
   next: NextFunction
 ) => {
   try {
-    const datetime = new Date();
-    datetime.setUTCHours(datetime.getUTCHours() - 7);
+    const token = req.cookies.authToken;
 
-    return res.status(200).json({ date: datetime.toLocaleString() });
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const now = DateTime.now().setZone(user.timeZone);
+
+    return res.status(200).json({ date: now.toString() });
   } catch (err) {
     console.log(err);
     if (!res.headersSent) {
@@ -474,7 +480,8 @@ export const getMorningUpdate: RequestHandler = async (
             const unread_messages = await getUnreadMessagesFunc(
               channel.id,
               last_read_timestamp,
-              user.slack_user_access_token
+              user.slack_user_access_token,
+              user.timeZone
             );
 
             if (!unread_messages) {
@@ -638,7 +645,8 @@ export const getUnreadMessages: RequestHandler = async (
         const unread_messages = await getUnreadMessagesFunc(
           channel.id,
           last_read_timestamp,
-          user.slack_user_access_token
+          user.slack_user_access_token,
+          user.timeZone
         );
 
         if (!unread_messages) {

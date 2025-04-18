@@ -23,6 +23,11 @@ import { Client } from "@notionhq/client";
 import { summarizeNotionWithLLM } from "./utils/chatgptFuncs";
 import { refreshAccessTokensFunc } from "./utils/refreshAccessTokensFunc";
 import { twilio_client } from "./utils/twilioClient";
+import {
+  getConversations,
+  getUnreadMessagesFunc,
+  getLastReadTimestamp,
+} from "./utils/slackApi";
 
 dotenv.config();
 
@@ -120,6 +125,8 @@ const prepareMorningBrief = async (user: any) => {
     let google_calender_events: Array<any> = [];
     let outlook_calender_events: Array<any> = [];
 
+    const all_unread_messages: Array<any> = [];
+
     await refreshAccessTokensFunc(user.token);
 
     if (user.google_login) {
@@ -178,6 +185,47 @@ const prepareMorningBrief = async (user: any) => {
       console.log("\nDone generating summary...");
     }
 
+    if (user.slack_login) {
+      const conversations = await getConversations(
+        user.slack_user_access_token
+      );
+
+      if (conversations) {
+        for (const channel of conversations.channels) {
+          const isDM = channel.is_im;
+
+          const last_read_timestamp = await getLastReadTimestamp(
+            channel.id,
+            user.slack_user_access_token
+          );
+
+          if (last_read_timestamp) {
+            const unread_messages = await getUnreadMessagesFunc(
+              channel.id,
+              last_read_timestamp,
+              user.slack_user_access_token,
+              user.timeZone
+            );
+
+            if (!unread_messages) {
+              continue;
+            }
+
+            if (unread_messages.length > 0) {
+              all_unread_messages.push({
+                channel_name: channel.name,
+                type: isDM
+                  ? "direct_message"
+                  : channel.is_private
+                  ? "private_channel"
+                  : "public_channel",
+              });
+            }
+          }
+        }
+      }
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -188,6 +236,7 @@ const prepareMorningBrief = async (user: any) => {
           outlook_calender_events: outlook_calender_events,
           google_emails: google_emails,
           outlook_emails: outlook_emails,
+          slack_unread_messages: all_unread_messages,
         }),
       },
     });

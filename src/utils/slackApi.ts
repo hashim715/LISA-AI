@@ -1,4 +1,5 @@
 import axios from "axios";
+import { DateTime } from "luxon";
 
 export const getConversations = async (slack_access_token: string) => {
   try {
@@ -83,10 +84,12 @@ export const getUsername = async (
 export const getUnreadMessagesFunc = async (
   channelId: string,
   lastReadTimestamp: string,
-  slack_access_token: string
+  slack_access_token: string,
+  timezone: string
 ) => {
   try {
-    const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+    const now = DateTime.now().setZone(timezone);
+    const twentyFourHoursAgo = now.minus({ hours: 24 }).toUTC();
 
     const response = await axios.get(
       "https://slack.com/api/conversations.history",
@@ -98,7 +101,7 @@ export const getUnreadMessagesFunc = async (
         params: {
           channel: channelId,
           limit: 100,
-          oldest: oneDayAgo.toString(),
+          oldest: twentyFourHoursAgo.toString(),
         },
       }
     );

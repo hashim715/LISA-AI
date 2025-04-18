@@ -127,7 +127,8 @@ export const getEmailsUsingSearchQuery: RequestHandler = async (
     if (user.google_login) {
       google_emails = await getGoogleEmailsFromSpecificSender(
         user.google_access_token,
-        searchField.trim()
+        searchField.trim(),
+        user.timeZone
       );
 
       if (!google_emails) {
@@ -925,12 +926,7 @@ export const drafteEmailReply: RequestHandler = async (
 
     if (type === "gmail") {
       if (user.google_login) {
-        const data = await draftGoogleGmailReplyFunc(
-          text,
-          res,
-          user,
-          user.timeZone
-        );
+        const data = await draftGoogleGmailReplyFunc(text, res, user);
 
         if (!data) {
           return res

@@ -174,14 +174,20 @@ export const getGoogleCalenderEvents = async (
 
 export const getGoogleEmailsFromSpecificSender = async (
   access_token: string,
-  searchQuery: string
+  searchQuery: string,
+  timezone: string
 ): Promise<null | any> => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+    const now = DateTime.now().setZone(timezone);
+    const twentyFourHoursAgo = now.minus({ hours: 72 }).toUTC();
+    const nowUtc = now.toUTC();
+
+    const after = Math.floor(twentyFourHoursAgo.toSeconds());
+    const before = Math.floor(nowUtc.toSeconds());
 
     const params = {
-      q: `"${searchQuery}" category:primary after:${oneDayAgo}`,
-      maxResults: 10,
+      q: `"${searchQuery}" category:primary after:${after} before:${before}`,
+      maxResults: 20,
     };
 
     const listResponse = await axios.get(
@@ -495,13 +501,19 @@ export const getReplySenderEmailsUsingSearchQuery = async (
 
 export const getSenderEmailsUsingSearchQuery = async (
   searchQuery: string,
-  access_token: string
+  access_token: string,
+  timezone: string
 ) => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+    const now = DateTime.now().setZone(timezone);
+    const twentyFourHoursAgo = now.minus({ days: 60 }).toUTC();
+    const nowUtc = now.toUTC();
+
+    const after = Math.floor(twentyFourHoursAgo.toSeconds());
+    const before = Math.floor(nowUtc.toSeconds());
 
     const params = {
-      q: `"${searchQuery}" category:primary after:${oneDayAgo}`,
+      q: `"${searchQuery}" category:primary after:${after} before:${before}`,
     };
 
     const listResponse = await axios.get(

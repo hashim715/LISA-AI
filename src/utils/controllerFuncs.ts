@@ -65,7 +65,8 @@ export const addGoogleCalenderFunc = async (
     for (const name of attendees) {
       const emailMetaData = await getSenderEmailsUsingSearchQuery(
         name,
-        user.google_access_token
+        user.google_access_token,
+        user.timeZone
       );
 
       const processedSearchQueryEmail = await getMatchingGmail(
@@ -230,7 +231,8 @@ export const draftGoogleGmailFunc = async (
 
     const emailMetaData = await getSenderEmailsUsingSearchQuery(
       name,
-      user.google_access_token
+      user.google_access_token,
+      user.timeZone
     );
 
     console.log(emailMetaData);
@@ -364,8 +366,7 @@ export const draftOutlookMailFunc = async (
 export const draftGoogleGmailReplyFunc = async (
   text: string,
   res: Response,
-  user: any,
-  timezone: string
+  user: any
 ) => {
   try {
     const processedInput = await getReplyGmailDraftFieldsUsingLLM(text);
@@ -394,7 +395,7 @@ export const draftGoogleGmailReplyFunc = async (
     const replyEmailMetaData = await getReplySenderEmailsUsingSearchQuery(
       name,
       user.google_access_token,
-      timezone
+      user.timeZone
     );
 
     console.log(replyEmailMetaData);

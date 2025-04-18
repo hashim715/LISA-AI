@@ -123,7 +123,10 @@ const prepareMorningBrief = async (user: any) => {
     await refreshAccessTokensFunc(user.token);
 
     if (user.google_login) {
-      google_emails = await getGoogleEmails(user.google_access_token);
+      google_emails = await getGoogleEmails(
+        user.google_access_token,
+        user.timeZone
+      );
     }
 
     if (user.outlook_login) {

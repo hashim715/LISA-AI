@@ -364,7 +364,8 @@ export const draftOutlookMailFunc = async (
 export const draftGoogleGmailReplyFunc = async (
   text: string,
   res: Response,
-  user: any
+  user: any,
+  timezone: string
 ) => {
   try {
     const processedInput = await getReplyGmailDraftFieldsUsingLLM(text);
@@ -392,7 +393,8 @@ export const draftGoogleGmailReplyFunc = async (
 
     const replyEmailMetaData = await getReplySenderEmailsUsingSearchQuery(
       name,
-      user.google_access_token
+      user.google_access_token,
+      timezone
     );
 
     console.log(replyEmailMetaData);

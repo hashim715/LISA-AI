@@ -3,15 +3,22 @@ import { decodeBase64Url } from "../utils/decodeBase64Url";
 import { htmlToText } from "html-to-text";
 import { summarizeEmailsWithLLM } from "./chatgptFuncs";
 import base64url from "base64url";
+import { DateTime } from "luxon";
 
 export const getGoogleEmails = async (
-  access_token: string
+  access_token: string,
+  timezone: string
 ): Promise<null | any> => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+    const now = DateTime.now().setZone(timezone);
+    const twentyFourHoursAgo = now.minus({ hours: 24 }).toUTC();
+    const nowUtc = now.toUTC();
+
+    const after = Math.floor(twentyFourHoursAgo.toSeconds());
+    const before = Math.floor(nowUtc.toSeconds());
 
     const params = {
-      q: `is:unread category:primary after:${oneDayAgo}`,
+      q: `is:unread category:primary after:${after} before:${before}`,
       maxResults: 10,
     };
 
@@ -422,13 +429,19 @@ export const createGmailReplyDraft = async (
 
 export const getReplySenderEmailsUsingSearchQuery = async (
   searchQuery: string,
-  access_token: string
+  access_token: string,
+  timezone: string
 ) => {
   try {
-    const oneDayAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
+    const now = DateTime.now().setZone(timezone);
+    const twentyFourHoursAgo = now.minus({ days: 30 }).toUTC();
+    const nowUtc = now.toUTC();
+
+    const after = Math.floor(twentyFourHoursAgo.toSeconds());
+    const before = Math.floor(nowUtc.toSeconds());
 
     const params = {
-      q: `"${searchQuery}" category:primary after:${oneDayAgo}`,
+      q: `"${searchQuery}" category:primary after:${after} before:${before}`,
       maxResults: 100,
     };
 

@@ -45,7 +45,7 @@ model User {
   morning_update_check Boolean @default(false)
   morning_update_preferences String?
   morning_brief_time  String?
-  timeZone String?
+  timeZone String @default("America/Los_Angeles")
   phone_number String?
   company_name String?
   position String?

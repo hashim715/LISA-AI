@@ -65,7 +65,10 @@ export const getUnreadEmails: RequestHandler = async (
     let outlook_emails: Array<any> = [];
 
     if (user.google_login) {
-      google_emails = await getGoogleEmails(user.google_access_token);
+      google_emails = await getGoogleEmails(
+        user.google_access_token,
+        user.timeZone
+      );
 
       if (!google_emails) {
         return badRequestResponse(res, "No emails found");
@@ -396,7 +399,10 @@ export const getMorningUpdate: RequestHandler = async (
     const all_unread_messages: Array<any> = [];
 
     if (user.google_login) {
-      google_emails = await getGoogleEmails(user.google_access_token);
+      google_emails = await getGoogleEmails(
+        user.google_access_token,
+        user.timeZone
+      );
     }
 
     if (user.outlook_login) {
@@ -919,7 +925,12 @@ export const drafteEmailReply: RequestHandler = async (
 
     if (type === "gmail") {
       if (user.google_login) {
-        const data = await draftGoogleGmailReplyFunc(text, res, user);
+        const data = await draftGoogleGmailReplyFunc(
+          text,
+          res,
+          user,
+          user.timeZone
+        );
 
         if (!data) {
           return res

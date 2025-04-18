@@ -911,8 +911,6 @@ export const drafteEmailReply: RequestHandler = async (
       return badRequestResponse(res, "Please provide valid inputs");
     }
 
-    console.log(text, type);
-
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);

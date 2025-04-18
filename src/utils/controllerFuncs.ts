@@ -395,6 +395,8 @@ export const draftGoogleGmailReplyFunc = async (
       user.google_access_token
     );
 
+    console.log(replyEmailMetaData);
+
     if (!replyEmailMetaData || replyEmailMetaData.length === 0) {
       return badRequestResponse(
         res,

@@ -1,4 +1,7 @@
-FROM node:22.2.0
+FROM node:23.11.0-slim
+
+# Install OpenSSL
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 

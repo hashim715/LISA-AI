@@ -29,16 +29,17 @@ import {
   createOutlookReplyDraft,
 } from "./outlookApi";
 
+import { DateTime } from "luxon";
+
 export const addGoogleCalenderFunc = async (
   res: Response,
   text: string,
   user: any
 ) => {
   try {
-    const processedInput = await getGoogleCalenderFieldsUsingLLM(
-      text,
-      new Date().toISOString()
-    );
+    const now = DateTime.now().setZone(user.timeZone).toString();
+
+    const processedInput = await getGoogleCalenderFieldsUsingLLM(text, now);
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");
@@ -117,10 +118,9 @@ export const addOutlookCalenderFunc = async (
   user: any
 ) => {
   try {
-    const processedInput = await getOutlookCalenderFieldsUsingLLM(
-      text,
-      new Date().toISOString()
-    );
+    const now = DateTime.now().setZone(user.timeZone).toString();
+
+    const processedInput = await getOutlookCalenderFieldsUsingLLM(text, now);
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");

@@ -184,7 +184,8 @@ export const getCalenderEvents: RequestHandler = async (
 
     if (user.google_login) {
       google_calender_events = await getGoogleCalenderEvents(
-        user.google_access_token
+        user.google_access_token,
+        user.timeZone
       );
 
       if (!google_calender_events) {
@@ -412,7 +413,8 @@ export const getMorningUpdate: RequestHandler = async (
 
     if (user.google_login) {
       google_calender_events = await getGoogleCalenderEvents(
-        user.google_access_token
+        user.google_access_token,
+        user.timeZone
       );
     }
 

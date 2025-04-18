@@ -124,15 +124,16 @@ export const getGoogleEmails = async (
 };
 
 export const getGoogleCalenderEvents = async (
-  access_token: string
+  access_token: string,
+  timezone: string
 ): Promise<null | any> => {
   try {
-    const now = new Date();
-    const sevenDaysLater = new Date();
-    sevenDaysLater.setDate(now.getDate() + 7);
+    const now = DateTime.now().setZone(timezone);
+    const sevenDaysLater = now.plus({ days: 7 });
 
-    const timeMin = now.toISOString();
-    const timeMax = sevenDaysLater.toISOString();
+    // Convert both to UTC ISO format (required by Google Calendar API)
+    const timeMin = now.toUTC().toISO();
+    const timeMax = sevenDaysLater.toUTC().toISO();
 
     const response = await axios.get(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(

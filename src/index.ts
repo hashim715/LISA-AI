@@ -135,7 +135,8 @@ const prepareMorningBrief = async (user: any) => {
 
     if (user.google_login) {
       google_calender_events = await getGoogleCalenderEvents(
-        user.google_access_token
+        user.google_access_token,
+        user.timeZone
       );
     }
 

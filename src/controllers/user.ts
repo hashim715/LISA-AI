@@ -794,7 +794,7 @@ export const addCalenderEvent: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    if (type === "google") {
+    if (type === "gmail") {
       if (user.google_login) {
         const data = await addGoogleCalenderFunc(res, text, user);
 
@@ -919,7 +919,7 @@ export const drafteEmailReply: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    if (type === "google") {
+    if (type === "gmail") {
       if (user.google_login) {
         const data = await draftGoogleGmailReplyFunc(text, res, user);
 

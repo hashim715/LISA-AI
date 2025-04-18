@@ -220,6 +220,8 @@ export const getReplyGmailDraftFieldsUsingLLM = async (input: string) => {
     Extract the following fields from the instruction and return a JSON object:
     - name
     - bodyContent
+
+    name would be the name of person and content would be the message they want to send.
     
     Instruction: "${input}"
     `;

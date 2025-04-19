@@ -94,7 +94,8 @@ export const summarizeNotionWithLLM = async (allContent: any) => {
 
 export const getGoogleCalenderFieldsUsingLLM = async (
   input: string,
-  today_date: string
+  today_date: string,
+  timeZone: string
 ) => {
   try {
     const prompt = `
@@ -111,10 +112,11 @@ export const getGoogleCalenderFieldsUsingLLM = async (
       Determine the appropriate timezone based on the user’s location.
 
       If a timezone is explicitly mentioned, use that.
-      If no timezone is mentioned but a location is provided, infer the timezone from the location.
-      If neither a timezone nor a location is given, default to America/Los_Angeles.
+      If neither a timezone nor a location is given, default to user's timezone as given.
 
-      Today’s date is: “${today_date}”
+      Today’s date is: "${today_date}"
+
+      User's timezone: "${timeZone}"
 
       Instruction: "${input}"
     `;
@@ -142,7 +144,8 @@ export const getGoogleCalenderFieldsUsingLLM = async (
 
 export const getGoogleCalenderFieldsForUpdateUsingLLM = async (
   input: string,
-  today_date: string
+  today_date: string,
+  timeZone: string
 ) => {
   try {
     const prompt = `
@@ -191,10 +194,11 @@ export const getGoogleCalenderFieldsForUpdateUsingLLM = async (
       }
 
       If a timezone is explicitly mentioned, use that.
-      If no timezone is mentioned but a location is provided, infer the timezone from the location.
-      If neither a timezone nor a location is given, default to America/Los_Angeles.
+      If neither a timezone nor a location is given, default to user's timezone as given.
 
       Today’s date is: "${today_date}"
+
+      User's timezone: "${timeZone}"
 
       Instruction: "${input}"
   `;

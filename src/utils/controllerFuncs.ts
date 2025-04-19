@@ -46,7 +46,11 @@ export const addGoogleCalenderFunc = async (
   try {
     const now = DateTime.now().setZone(user.timeZone).toString();
 
-    const processedInput = await getGoogleCalenderFieldsUsingLLM(text, now);
+    const processedInput = await getGoogleCalenderFieldsUsingLLM(
+      text,
+      now,
+      user.timeZone
+    );
 
     if (!processedInput) {
       return badRequestResponse(res, "Please provide valid input");
@@ -215,7 +219,8 @@ export const updateGoogleCalenderFunc = async (
 
     const processedInput = await getGoogleCalenderFieldsForUpdateUsingLLM(
       text,
-      now
+      now,
+      user.timeZone
     );
 
     if (!processedInput) {

@@ -27,7 +27,8 @@ import {
   addEvent,
   addUserDetails,
   addPhoneNumber,
-  testingMessageSend,
+  updateCalenderEvent,
+  deleteCalenderEvent,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -48,6 +49,12 @@ userRouter
 userRouter
   .route("/addGoogleCalenderEvent")
   .post(protectAgent, refreshAccessToken, addCalenderEvent);
+userRouter
+  .route("/updateGoogleCalenderEvent")
+  .post(protectAgent, refreshAccessToken, updateCalenderEvent);
+userRouter
+  .route("/deleteGoogleCalenderEvent")
+  .post(protectAgent, refreshAccessToken, deleteCalenderEvent);
 userRouter
   .route("/draftGoogleGmail")
   .post(protectAgent, refreshAccessToken, draftEmail);
@@ -88,4 +95,3 @@ userRouter
 userRouter.route("/perplexityNewsPublicApi").post(perplexityApi);
 userRouter.route("/getEventsPublicApi").get(getPublicEvents);
 userRouter.route("/addEvent").post(addEvent);
-// userRouter.route("/testingSendMessage").get(testingMessageSend);

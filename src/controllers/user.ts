@@ -44,11 +44,17 @@ import {
   draftOutlookMailFunc,
   draftGoogleGmailReplyFunc,
   draftOutlookMailReplyFunc,
+  updateGoogleCalenderFunc,
+  deleteGoogleCalenderFunc,
 } from "../utils/controllerFuncs";
 import { scheduleUserBriefs } from "../index";
 import { validatePhoneNumber } from "../utils/validatePhoneNumber";
 import { twilio_client } from "../utils/twilioClient";
 import { DateTime } from "luxon";
+import {
+  areaCodeToTimeZone,
+  regionToTimeZone,
+} from "../utils/allStateTimeZones";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -854,6 +860,131 @@ export const addCalenderEvent: RequestHandler = async (
   }
 };
 
+export const updateCalenderEvent: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { text, type }: { text: string; type: string } = req.body;
+
+    if (!text || !text.trim() || !type || !type.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    console.log(text, type);
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (type === "gmail") {
+      if (user.google_login) {
+        const data = await updateGoogleCalenderFunc(res, text, user);
+
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Calender not added" });
+        }
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: "User is not connected to google" });
+      }
+    } else if (type === "outlook") {
+      if (user.outlook_login) {
+        const data = await addOutlookCalenderFunc(text, res, user);
+
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Calender not added" });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "User is not connected to outlook",
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Event updated in your calender successfully",
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
+export const deleteCalenderEvent: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { text, type }: { text: string; type: string } = req.body;
+
+    if (!text || !text.trim() || !type || !type.trim()) {
+      return badRequestResponse(res, "Please provide valid inputs");
+    }
+
+    console.log(text, type);
+
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (type === "gmail") {
+      if (user.google_login) {
+        const data = await deleteGoogleCalenderFunc(res, text, user);
+
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Calender not added" });
+        }
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: "User is not connected to google" });
+      }
+    } else if (type === "outlook") {
+      if (user.outlook_login) {
+        const data = await addOutlookCalenderFunc(text, res, user);
+
+        if (!data) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Calender not added" });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "User is not connected to outlook",
+        });
+      }
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Event deleted in your calender successfully",
+    });
+  } catch (err) {
+    console.log(err);
+    if (!res.headersSent) {
+      return internalServerError(res);
+    }
+  }
+};
+
 export const draftEmail: RequestHandler = async (
   req: Request,
   res: Response,
@@ -1164,15 +1295,14 @@ export const addMorningPreferences: RequestHandler = async (
     const {
       prompt,
       morningBriefTime,
-      timezone,
-    }: { prompt: string; morningBriefTime: string; timezone: string } =
-      req.body;
+      region,
+    }: { prompt: string; morningBriefTime: string; region: string } = req.body;
 
     if (
       !morningBriefTime ||
       !morningBriefTime.trim() ||
-      !timezone ||
-      !timezone.trim()
+      !region ||
+      !region.trim()
     ) {
       return badRequestResponse(res, "Please provide valid inputs");
     }
@@ -1190,12 +1320,20 @@ export const addMorningPreferences: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
+    const timeZone = regionToTimeZone[region];
+
+    if (!timeZone) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide valid region" });
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
         morning_update_preferences: prompt,
         morning_brief_time: morningBriefTime,
-        timeZone: timezone,
+        timeZone: timeZone,
       },
     });
 
@@ -1272,7 +1410,9 @@ export const addUserDetails: RequestHandler = async (
     const {
       company_name,
       position,
-    }: { company_name: string; position: string } = req.body;
+      profile_image,
+    }: { company_name: string; position: string; profile_image: string } =
+      req.body;
 
     if (
       !company_name ||
@@ -1281,25 +1421,6 @@ export const addUserDetails: RequestHandler = async (
       !position.trim()
     ) {
       return badRequestResponse(res, "Please provide valid inputs");
-    }
-
-    let { phone_number }: { phone_number: string } = req.body;
-
-    if (!phone_number.trim()) {
-      return badRequestResponse(res, "Please provide valid inputs");
-    }
-
-    if (!phone_number.startsWith("+1")) {
-      phone_number = phone_number.startsWith("1")
-        ? "+" + phone_number
-        : "+1" + phone_number;
-    }
-
-    if (!validatePhoneNumber(phone_number)) {
-      return badRequestResponse(
-        res,
-        "Phone number that you provided is not valid"
-      );
     }
 
     const token = req.cookies.authToken;
@@ -1311,9 +1432,9 @@ export const addUserDetails: RequestHandler = async (
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        phone_number: phone_number,
         company_name: company_name,
         position: position,
+        profile_image: profile_image ? profile_image : user.profile_image,
       },
     });
 
@@ -1353,6 +1474,16 @@ export const addPhoneNumber: RequestHandler = async (
       );
     }
 
+    const areaCode: string = phone_number.slice(2, 5);
+    let timeZone = areaCodeToTimeZone[areaCode];
+
+    if (!timeZone) {
+      return res.status(400).json({
+        success: false,
+        message: "please provide a valid phone number",
+      });
+    }
+
     const token = req.cookies.authToken;
 
     const { username }: { username: string } = jwt_decode(token);
@@ -1363,6 +1494,7 @@ export const addPhoneNumber: RequestHandler = async (
       where: { id: user.id },
       data: {
         phone_number: phone_number,
+        timeZone: timeZone,
       },
     });
 

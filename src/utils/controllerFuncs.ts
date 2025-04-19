@@ -9,6 +9,9 @@ import {
   getOutlookDraftFieldsUsingLLM,
   getReplyOutlookDraftFieldsUsingLLM,
   getMatchingReplyOutlookMail,
+  getGoogleCalenderFieldsForUpdateUsingLLM,
+  getMatchingCalenderEvent,
+  getDeleteSearchQueryUsingLLM,
 } from "./chatgptFuncs";
 
 import { badRequestResponse } from "../controllers/errors";
@@ -19,6 +22,10 @@ import {
   getSenderEmailsUsingSearchQuery,
   createGmailReplyDraft,
   getReplySenderEmailsUsingSearchQuery,
+  searchGoogleCalendarEventsFunc,
+  updateGoogleCalendarEventFunc,
+  deleteGoogleCalendarEventFunc,
+  getGoogleCalenderEvents,
 } from "./gmailApi";
 
 import {
@@ -189,6 +196,211 @@ export const addOutlookCalenderFunc = async (
         success: false,
         message:
           "could not add calender event can you please try again may be something wrong with the input you provided",
+      });
+    }
+
+    return data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const updateGoogleCalenderFunc = async (
+  res: Response,
+  text: string,
+  user: any
+) => {
+  try {
+    const now = DateTime.now().setZone(user.timeZone).toString();
+
+    const processedInput = await getGoogleCalenderFieldsForUpdateUsingLLM(
+      text,
+      now
+    );
+
+    if (!processedInput) {
+      return badRequestResponse(res, "Please provide valid input");
+    }
+
+    console.log(processedInput);
+
+    const {
+      title,
+      description,
+      location,
+      start,
+      end,
+      attendees,
+      query,
+    }: {
+      title: string;
+      description: string;
+      location: string;
+      start: any;
+      end: any;
+      attendees: any;
+      query: string;
+    } = JSON.parse(processedInput);
+
+    let emailArray = [];
+
+    if (attendees) {
+      for (const name of attendees) {
+        const emailMetaData = await getSenderEmailsUsingSearchQuery(
+          name,
+          user.google_access_token,
+          user.timeZone
+        );
+
+        const processedSearchQueryEmail = await getMatchingGmail(
+          name,
+          emailMetaData
+        );
+
+        const { from }: { from: string } = JSON.parse(
+          processedSearchQueryEmail
+        );
+
+        if (from) {
+          emailArray.push({ email: from });
+        }
+      }
+    }
+
+    emailArray = emailArray.filter(
+      (email) => email.email !== "name@example.com"
+    );
+
+    const events = await searchGoogleCalendarEventsFunc(
+      user.google_access_token,
+      user.timeZone
+    );
+
+    console.log(events);
+
+    if (!events || events.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "event that you mentioned does not exists",
+      });
+    }
+
+    const matchinEvent = await getMatchingCalenderEvent(query, events, now);
+
+    if (!matchinEvent) {
+      return badRequestResponse(
+        res,
+        "Could not find emails for the given name"
+      );
+    }
+
+    console.log(matchinEvent);
+
+    const { event }: { event: any } = JSON.parse(matchinEvent);
+
+    if (!event) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Tell the user i tried to find the event couldn't find it so please specify exactly which event to update",
+      });
+    }
+
+    const data = await updateGoogleCalendarEventFunc(
+      user.google_access_token,
+      event,
+      title,
+      description,
+      location,
+      start,
+      end,
+      attendees ? emailArray : null
+    );
+
+    if (!data) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "could not update calender event can you please try again may be something wrong with the input you provided",
+      });
+    }
+
+    return data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const deleteGoogleCalenderFunc = async (
+  res: Response,
+  text: string,
+  user: any
+) => {
+  try {
+    const searchQuery = await getDeleteSearchQueryUsingLLM(text);
+    const now = DateTime.now().setZone(user.timeZone).toString();
+
+    if (!searchQuery) {
+      return res.status(400).json({
+        success: false,
+        message: "could not find out what user is asking",
+      });
+    }
+
+    const { query }: { query: any } = JSON.parse(searchQuery);
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: "could not find out what user is asking",
+      });
+    }
+
+    console.log(query);
+
+    const events = await getGoogleCalenderEvents(
+      user.google_access_token,
+      user.timeZone
+    );
+
+    console.log(events);
+
+    if (!events || events.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "event that you mentioned does not exists",
+      });
+    }
+
+    const matchinEvent = await getMatchingCalenderEvent(query, events, now);
+
+    if (!matchinEvent) {
+      return badRequestResponse(
+        res,
+        "Could not find emails for the given name"
+      );
+    }
+
+    const { event }: { event: any } = JSON.parse(matchinEvent);
+
+    if (!event) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Tell the user i tried to find the event couldn't find it so please specify exactly which event to update",
+      });
+    }
+
+    const data = await deleteGoogleCalendarEventFunc(
+      user.google_access_token,
+      event.id
+    );
+
+    if (!data) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "could not update calender event can you please try again may be something wrong with the input you provided",
       });
     }
 

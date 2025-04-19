@@ -140,6 +140,156 @@ export const getGoogleCalenderFieldsUsingLLM = async (
   }
 };
 
+export const getGoogleCalenderFieldsForUpdateUsingLLM = async (
+  input: string,
+  today_date: string
+) => {
+  try {
+    const prompt = `
+      Extract event details from the user instruction and construct a search query to find matching events. Return a JSON object with keys:
+      - query: a search query constructed from the extracted title, description, or location (prioritize title, then description, then location; combine if multiple fields are provided), or null if no fields are suitable
+      - title: if provided, otherwise null
+      - description: if provided, otherwise null
+      - location: if provided, otherwise null
+      - start: { dateTime, timeZone } if provided, otherwise null
+      - end: { dateTime, timeZone } if provided, otherwise null
+      - attendees (optional): array of attendies like [name] if provided otherwise null
+
+      Example Instructions and Outputs:
+
+      1. Instruction: "Set a meeting at 3pm at Y-Combinator building with Sam Altman to discuss funding strategies for my startup. Keep it an hour long."
+        Output: {
+          "query": "funding Y-Combinator",
+          "title": "Meeting to discuss funding strategies",
+          "description": "Discuss funding strategies for my startup",
+          "location": "Y-Combinator building",
+          "start": { "dateTime": "2025-04-19T15:00:00", "timeZone": "America/Los_Angeles" },
+          "end": { "dateTime": "2025-04-19T16:00:00", "timeZone": "America/Los_Angeles" },
+          "attendees": [sam altman],
+      }
+
+      2. Instruction: "Schedule a budget review at 2pm in New York tomorrow."
+        Output: {
+          "query": "budget review New York",
+          "title": "Budget review",
+          "description": null,
+          "location": "New York",
+          "start": { "dateTime": "2025-04-20T14:00:00", "timeZone": "America/New_York" },
+          "end": null,
+          "attendees": [],
+      }
+
+      3. Instruction: "Plan a team meeting with Jane Doe at 10am."
+        Output: {
+          "query": "team meeting",
+          "title": "Team meeting",
+          "description": null,
+          "location": null,
+          "start": { "dateTime": "2025-04-19T10:00:00", "timeZone": "America/Los_Angeles" },
+          "end": null,
+          "attendees": [jan doe],
+      }
+
+      If a timezone is explicitly mentioned, use that.
+      If no timezone is mentioned but a location is provided, infer the timezone from the location.
+      If neither a timezone nor a location is given, default to America/Los_Angeles.
+
+      Today’s date is: "${today_date}"
+
+      Instruction: "${input}"
+  `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract calendar event information from user instructions.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getMatchingCalenderEvent = async (
+  inputEvent: any,
+  eventList: Array<any>,
+  today_date: string
+) => {
+  try {
+    const prompt = `
+     Extract the event from the list of events by matching and getting the most similar and return a json object
+
+     - {event: object}
+
+    Available emails:
+    ${JSON.stringify(eventList)}
+
+    Today’s date is: "${today_date}"
+    
+    Instruction: "${JSON.stringify(inputEvent)}"
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract calendar event details by matching a provided search query against a list of events, returning the first matching event or null with a debug message.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
+export const getDeleteSearchQueryUsingLLM = async (input: string) => {
+  try {
+    const prompt = `
+Given the following instruction, extract the user's search query—such as a name, description, or location—and return it as a JSON object with the field:
+
+- query
+
+Instruction: "${input}"
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You extract search query from the given instruction",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    return response.choices[0].message.content;
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+};
+
 export const getGmailDraftFieldsUsingLLM = async (input: string) => {
   try {
     const prompt = `

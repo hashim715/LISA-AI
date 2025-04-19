@@ -8,7 +8,7 @@ import jwt_decode from "jwt-decode";
 export const refreshAccessTokensFunc = async (token: string) => {
   try {
     const { username }: { username: string } = jwt_decode(token);
-    const user = await prisma.user.findFirst({ where: { username: username } });
+    let user = await prisma.user.findFirst({ where: { username: username } });
 
     if (user.google_login) {
       const currentDate = new Date();
@@ -69,7 +69,12 @@ export const refreshAccessTokensFunc = async (token: string) => {
         });
       }
     }
+
+    user = await prisma.user.findFirst({ where: { username: username } });
+
+    return user;
   } catch (err) {
     console.log(err);
+    return null;
   }
 };

@@ -248,13 +248,14 @@ export const googleredirectauth: RequestHandler = async (
         google_access_token: access_token,
         google_refresh_token: refresh_token,
         google_token_expiry: expiryDate.toISOString(),
+        morning_update_check: true,
       },
     });
 
     await sendTokenCookie(res, username);
 
     return res
-      .status(200)
+      .status(201)
       .json({ success: true, message: "Logged in successfully" });
   } catch (err) {
     console.log(err);
@@ -371,13 +372,14 @@ export const outlookredirectauth: RequestHandler = async (
         outlook_access_token: access_token,
         outlook_refresh_token: refresh_token,
         outlook_token_expiry: expiryDate.toISOString(),
+        morning_update_check: true,
       },
     });
 
     await sendTokenCookie(res, username);
 
     return res
-      .status(200)
+      .status(201)
       .json({ success: true, message: "Logged in successfully" });
   } catch (err) {
     console.log(err);

@@ -150,6 +150,7 @@ export const getGoogleCalenderEvents = async (
     );
 
     const eventsData: Array<any> = response.data.items.map((item: any) => ({
+      id: item.id,
       title: item.summary || "No Title", // Event title
       description: item.description || "No Description", // Event description
       location: item.location || "No Location", // Event location
@@ -557,6 +558,127 @@ export const getSenderEmailsUsingSearchQuery = async (
     console.log(
       "get emails using search query for reply draft Error:",
       err.response?.data || err.message || err
+    );
+    return null;
+  }
+};
+
+export const updateGoogleCalendarEventFunc = async (
+  access_token: string,
+  previousEvent: any,
+  summary: string,
+  description: string,
+  location: string,
+  start: any,
+  end: any,
+  attendees: any
+) => {
+  const calendarId = "primary";
+  const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${previousEvent.id}`;
+
+  const event = {
+    summary: summary ? summary : previousEvent.title,
+    description: description ? description : previousEvent.description,
+    location: location ? location : previousEvent.location,
+    start: start ? start : previousEvent.start,
+    end: end ? end : previousEvent.end,
+    attendees: attendees ? attendees : previousEvent.attendees,
+    reminders: {
+      useDefault: true,
+    },
+  };
+
+  console.log(event);
+
+  try {
+    const response = await axios.put(apiUrl, event, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.log("Error updating event:", error.response?.data || error.message);
+    return null;
+  }
+};
+
+export const deleteGoogleCalendarEventFunc = async (
+  access_token: string,
+  eventId: string
+) => {
+  const calendarId = "primary";
+  const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`;
+
+  try {
+    await axios.delete(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.log("Error deleting event:", error.response?.data || error.message);
+    return null;
+  }
+};
+
+// Search calendar events by name
+export const searchGoogleCalendarEventsFunc = async (
+  access_token: string,
+  timezone: string
+) => {
+  try {
+    const now = DateTime.now().setZone(timezone);
+    const sevenDaysLater = now.plus({ days: 7 });
+
+    // Convert both to UTC ISO format (required by Google Calendar API)
+    const timeMin = now.toUTC().toISO();
+    const timeMax = sevenDaysLater.toUTC().toISO();
+
+    const response = await axios.get(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
+        timeMin
+      )}&timeMax=${encodeURIComponent(
+        timeMax
+      )}&orderBy=startTime&singleEvents=true&maxAttendees=100`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
+
+    const eventsData: Array<any> = response.data.items.map((item: any) => ({
+      id: item.id,
+      title: item.summary || "No Title", // Event title
+      description: item.description || "No Description", // Event description
+      location: item.location || "No Location", // Event location
+      start: {
+        dateTime: item.start.dateTime || null,
+        timeZone: item.start.timeZone || "America/Los_Angeles",
+      },
+      end: {
+        dateTime: item.end.dateTime || null,
+        timeZone: item.end.timeZone || "America/Los_Angeles",
+      },
+      attendees: item.attendees
+        ? item.attendees.map((attendee: any) => ({
+            email: attendee.email,
+            responseStatus: attendee.responseStatus || "needsAction",
+          }))
+        : [],
+    }));
+
+    return eventsData;
+  } catch (error: any) {
+    console.error(
+      "Error searching events:",
+      error.response?.data || error.message
     );
     return null;
   }

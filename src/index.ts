@@ -32,7 +32,7 @@ import {
 dotenv.config();
 
 const app: Application = express();
-const PORT: number = parseInt(process.env.PORT) || 5001;
+const PORT: number = parseInt(process.env.PORT) || 5002;
 
 app.use(express.json());
 app.use(cookieParser());
@@ -43,23 +43,32 @@ const allowedOrigins = [
   "http://localhost:5173",
   "https://ourlisa.com",
   "https://www.ourlisa.com",
+  "https://beta.ourlisa.com",
+  "http://192.168.1.168:5173",
+  "http://0.0.0.0:5173",
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
+const corsOptions =
+  process.env.ALLOW_ALL_ORIGINS === "true"
+    ? {
+        origin: function (origin: any, callback: any) {
+          callback(null, origin || "*"); // Allow all origins
+        },
+        credentials: true,
       }
-    },
-    credentials: true,
-  })
-);
+    : {
+        origin: function (origin: any, callback: any) {
+          if (!origin) return callback(null, true);
+          if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+          } else {
+            return callback(new Error("Not allowed by CORS"));
+          }
+        },
+        credentials: true,
+      };
+
+app.use(cors(corsOptions));
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -117,6 +126,23 @@ const getPrepCronExpression = (briefTime: string) => {
   return `0 ${prepMinutes} ${prepHours} * * *`; // e.g., "0 50 6 * * *" for 6:50 AM
 };
 
+const updateUserStateAndSendMorningBriefMessage = async (user: any) => {
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      morning_update_check: false,
+    },
+  });
+
+  if (user.phone_number) {
+    const message = await twilio_client.messages.create({
+      body: `Your morning brief is ready! View it here: https://beta.ourlisa.com/main`,
+      from: process.env.TWILIO_ACCOUNT_PHONE_NUMBER,
+      to: user.phone_number,
+    });
+  }
+};
+
 const prepareMorningBrief = async (user: any) => {
   try {
     let google_emails: Array<any> = [];
@@ -127,17 +153,31 @@ const prepareMorningBrief = async (user: any) => {
 
     const all_unread_messages: Array<any> = [];
 
-    await refreshAccessTokensFunc(user.token);
+    user = await refreshAccessTokensFunc(user.token);
+
+    if (!user) {
+      return;
+    }
 
     if (user.google_login) {
       google_emails = await getGoogleEmails(
         user.google_access_token,
         user.timeZone
       );
+
+      if (!google_emails) {
+        await updateUserStateAndSendMorningBriefMessage(user);
+        return;
+      }
     }
 
     if (user.outlook_login) {
       outlook_emails = await getOutlookEmails(user.outlook_access_token);
+
+      if (!outlook_emails) {
+        await updateUserStateAndSendMorningBriefMessage(user);
+        return;
+      }
     }
 
     if (user.google_login) {
@@ -145,12 +185,22 @@ const prepareMorningBrief = async (user: any) => {
         user.google_access_token,
         user.timeZone
       );
+
+      if (!google_calender_events) {
+        await updateUserStateAndSendMorningBriefMessage(user);
+        return;
+      }
     }
 
     if (user.outlook_login) {
       outlook_calender_events = await getOutlookCalenderEvents(
         user.outlook_access_token
       );
+
+      if (!outlook_calender_events) {
+        await updateUserStateAndSendMorningBriefMessage(user);
+        return;
+      }
     }
 
     let notion_summary = null;
@@ -243,13 +293,14 @@ const prepareMorningBrief = async (user: any) => {
 
     if (user.phone_number) {
       const message = await twilio_client.messages.create({
-        body: `Your morning brief is ready`,
+        body: `Your morning brief is ready! View it here: https://beta.ourlisa.com/main`,
         from: process.env.TWILIO_ACCOUNT_PHONE_NUMBER,
         to: user.phone_number,
       });
     }
   } catch (err) {
     console.log(err);
+    await updateUserStateAndSendMorningBriefMessage(user);
   }
 };
 

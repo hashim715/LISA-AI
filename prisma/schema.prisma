@@ -42,13 +42,14 @@ model User {
   preferences String?
   preferences_added Boolean @default(false)
   morning_update String?
-  morning_update_check Boolean @default(false)
+  morning_update_check Boolean @default(true)
   morning_update_preferences String?
   morning_brief_time  String?
   timeZone String @default("America/Los_Angeles")
   phone_number String?
-  company_name String?
-  position String?
+  company_name String @default("Not Known")
+  position String @default("Not Known")
+  profile_image String?
 }
 
 model Events {

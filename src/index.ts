@@ -33,7 +33,7 @@ import { logger } from "./utils/logger";
 dotenv.config();
 
 const app: Application = express();
-const PORT: number = parseInt(process.env.PORT) || 5002;
+const PORT: number = parseInt(process.env.PORT) || 5001;
 
 app.use(express.json());
 app.use(cookieParser());

@@ -1,0 +1,133 @@
+Draft an email to Azhar, informing him that the product development meeting has been scheduled for Tuesday at 8 a.m., and include the user's name, Shahbaz Abdullah Magsi, at the end. gmail
+{
+  "name": "Azhar",
+  "subject": "Product Development Meeting Scheduled",
+  "bodyContent": "Dear Azhar, the product development meeting has been scheduled for Tuesday at 8 a.m. Regards, Shahbaz Abdullah Magsi"
+}
+[]
+{
+  "from": "name@example.com"
+}
+Set an investor meeting on Wednesday from 9 a.m. to 9:30 a.m. at Starbucks on 529 Houston. gmail
+[]
+{
+  ok: true,
+  app_id: 'A08LKAC7N8H',
+  authed_user: {
+    id: 'U08L8ADQH51',
+    scope: 'channels:history,im:history,mpim:history,channels:read,im:read,users:read,users:read.email',
+    access_token: 'xoxp-8688349815331-8688353833171-8742839108389-f52b6f9e3120d85e3eac8156cd0f606b',
+    token_type: 'user'
+  },
+  scope: 'channels:read,channels:join,channels:manage,channels:history,groups:history,users:read,chat:write,groups:read,im:history,im:read,mpim:history,users:read.email',
+  token_type: 'bot',
+  access_token: 'xoxb-8688349815331-8691614410643-jrahYpfAkxI6nR7JKX2IoBuU',
+  bot_user_id: 'U08LBJ2C2JX',
+  team: { id: 'T08L8A9PZ9R', name: 'Lisa' },
+  enterprise: null,
+  is_enterprise_install: false
+}
+undefined
+
+Generating summary...
+
+Done generating summary...
+Draft an email to Azure, informing them that the product is ready and we should be launching soon. Include Shahbaz Abdullah Magsi's name at the end. gmail
+{
+  "name": "Shahbaz Abdullah Magsi",
+  "subject": "Product Launch Update",
+  "bodyContent": "Dear Azure, I am informing you that the product is ready and we should be launching soon. Best regards, Shahbaz Abdullah Magsi"
+}
+get emails using search query for reply draft Error: {
+  error: {
+    code: 429,
+    message: 'Too many concurrent requests for user.',
+    errors: [ [Object] ],
+    status: 'RESOURCE_EXHAUSTED'
+  }
+}
+null
+{
+  "from": "name@example.com"
+}
+Draft an email to Josh at ourlisa.com, letting him know that the product is almost ready and we should be able to launch it soon. Include Shahbaz Abdullah Magsi's name at the end. gmail
+{
+  "name": "Shahbaz Abdullah Magsi",
+  "subject": "Product Launch Update",
+  "bodyContent": "Hi Josh, the product is almost ready and we should be able to launch it soon. \n\nBest, \nShahbaz Abdullah Magsi"
+}
+get emails using search query for reply draft Error: {
+  error: {
+    code: 429,
+    message: 'Too many concurrent requests for user.',
+    errors: [ [Object] ],
+    status: 'RESOURCE_EXHAUSTED'
+  }
+}
+null
+{
+  "from": "name@example.com"
+}
+Draft an email to Josh, letting him know that the product is almost ready and we should launch it very soon. Include the user's name, Shahbaz Abdullah Magsi, at the end. gmail
+{
+  "name": "Shahbaz Abdullah Magsi",
+  "subject": "Product Launch Update",
+  "bodyContent": "Hi Josh, I wanted to let you know that the product is almost ready and we should launch it very soon. Best, Shahbaz Abdullah Magsi"
+}
+get emails using search query for reply draft Error: {
+  error: {
+    code: 429,
+    message: 'Too many concurrent requests for user.',
+    errors: [ [Object] ],
+    status: 'RESOURCE_EXHAUSTED'
+  }
+}
+null
+{
+  "from": "name@example.com"
+}
+Set a meeting on April 24th from 10 a.m. to 12 p.m. on a Zoom call with Mac to discuss our marketing strategy. gmail
+get emails using search query for reply draft Error: {
+  error: {
+    code: 429,
+    message: 'Too many concurrent requests for user.',
+    errors: [ [Object] ],
+    status: 'RESOURCE_EXHAUSTED'
+  }
+}
+[]
+TypeError: conversations.channels is not iterable
+    at sendMessage (/usr/src/app/src/controllers/user.ts:721:41)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+Draft an email to Josh, informing him that the product is almost ready and we should be able to launch soon. Include Shahbaz Abdullah Magsi's name at the end. gmail
+{
+  "name": "Shahbaz Abdullah Magsi",
+  "subject": "Product Launch Update",
+  "bodyContent": "Hi Josh, I wanted to inform you that the product is almost ready and we should be able to launch soon. Best, Shahbaz Abdullah Magsi"
+}
+get emails using search query for reply draft Error: {
+  error: {
+    code: 429,
+    message: 'Too many concurrent requests for user.',
+    errors: [ [Object] ],
+    status: 'RESOURCE_EXHAUSTED'
+  }
+}
+null
+{
+  "from": "name@example.com"
+}
+Set a meeting on April 24th from 10 a.m. to 12 p.m. via Zoom with Mac to discuss our marketing strategies. gmail
+get emails using search query for reply draft Error: {
+  error: {
+    code: 429,
+    message: 'Too many concurrent requests for user.',
+    errors: [ [Object] ],
+    status: 'RESOURCE_EXHAUSTED'
+  }
+}
+[]
+
+Generating summary...
+
+Done generating summary...

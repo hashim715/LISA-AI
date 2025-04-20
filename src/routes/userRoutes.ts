@@ -29,6 +29,8 @@ import {
   addPhoneNumber,
   updateCalenderEvent,
   deleteCalenderEvent,
+  getLatestEmails,
+  deleteGoogleGmail,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -40,6 +42,9 @@ export const userRouter: Router = express.Router();
 userRouter
   .route("/getUnreadEmails")
   .post(protectAgent, refreshAccessToken, getUnreadEmails);
+userRouter
+  .route("/getLatestEmails")
+  .post(protectAgent, refreshAccessToken, getLatestEmails);
 userRouter
   .route("/getCalenderEvents")
   .post(protectAgent, refreshAccessToken, getCalenderEvents);
@@ -61,6 +66,9 @@ userRouter
 userRouter
   .route("/draftReplyGoogleGmail")
   .post(protectAgent, refreshAccessToken, drafteEmailReply);
+userRouter
+  .route("/deleteSpecificGmail")
+  .post(protectAgent, refreshAccessToken, deleteGoogleGmail);
 userRouter.route("/getCurrentDateTime").post(protectAgent, getCurrentDateTime);
 userRouter.route("/notionData").post(protectAgent, notionDataApi);
 userRouter

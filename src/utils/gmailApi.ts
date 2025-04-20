@@ -4,122 +4,443 @@ import { htmlToText } from "html-to-text";
 import { summarizeEmailsWithLLM } from "./chatgptFuncs";
 import base64url from "base64url";
 import { DateTime } from "luxon";
+import { Email } from "./types";
+import { logger } from "./logger";
+
+// Shared email summarization function
+const summarizeEmailArray = async (
+  emails: Array<Email>
+): Promise<Array<Email>> => {
+  const summarizedEmails: Array<Email> = [];
+
+  const summarizedEmailResults = await Promise.allSettled(
+    emails.map(async (email) => {
+      const summary = await summarizeEmailsWithLLM(email.body);
+      return {
+        ...email,
+        body: summary || email.body,
+      };
+    })
+  );
+
+  summarizedEmailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      summarizedEmails.push(result.value);
+    } else {
+      logger.error(
+        `LLM summarization error at email from ${emails[index].from}:`,
+        result.reason
+      );
+    }
+  });
+
+  return summarizedEmails;
+};
 
 export const getGoogleEmails = async (
   access_token: string,
   timezone: string
-): Promise<null | any> => {
-  try {
-    const now = DateTime.now().setZone(timezone);
-    const twentyFourHoursAgo = now.minus({ hours: 24 }).toUTC();
-    const nowUtc = now.toUTC();
+): Promise<Array<Email>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
+  }
 
-    const after = Math.floor(twentyFourHoursAgo.toSeconds());
-    const before = Math.floor(nowUtc.toSeconds());
+  const now = DateTime.now().setZone(timezone);
+  const twentyFourHoursAgo = now.minus({ hours: 24 }).toUTC();
+  const nowUtc = now.toUTC();
 
-    const params = {
-      q: `is:unread category:primary after:${after} before:${before}`,
-      maxResults: 10,
-    };
+  const after = Math.floor(twentyFourHoursAgo.toSeconds());
+  const before = Math.floor(nowUtc.toSeconds());
 
-    const listResponse = await axios.get(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: params,
-      }
-    );
+  const params = {
+    q: `is:unread category:primary after:${after} before:${before}`,
+    maxResults: 10,
+  };
 
-    const messages = listResponse.data.messages || [];
+  const listResponse = await axios
+    .get("https://gmail.googleapis.com/gmail/v1/users/me/messages", {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: params,
+    })
+    .catch((err) => {
+      logger.error("Gmail API list error:", err.response?.data || err.message);
+      throw new Error("Failed to fetch Gmail message list");
+    });
 
-    const unreadEmails = await Promise.all(
-      messages.map(async (message: any) => {
-        const msgResponse = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" },
-          }
-        );
+  const messages = listResponse.data.messages || [];
+  if (messages.length === 0) return [];
 
-        const { payload, internalDate } = msgResponse.data;
-        const headers = payload.headers || [];
-
-        const subjectHeader = headers.find((h: any) => h.name === "Subject");
-        const fromHeader = headers.find((h: any) => h.name === "From");
-
-        const subject = subjectHeader ? subjectHeader.value : "No Subject";
-        const from = fromHeader ? fromHeader.value : "Unknown Sender";
-
-        let body = "";
-        if (payload.parts) {
-          const textPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/plain"
-          );
-          const htmlPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/html"
-          );
-          body =
-            textPart && textPart.body.data
-              ? decodeBase64Url(textPart.body.data)
-              : htmlPart && htmlPart.body.data
-              ? decodeBase64Url(htmlPart.body.data)
-              : "No readable content";
-        } else if (payload.body && payload.body.data) {
-          body = decodeBase64Url(payload.body.data);
+  const unreadEmailResults = await Promise.allSettled(
+    messages.map(async (message: { id: string }) => {
+      const msgResponse = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { format: "full" },
         }
+      );
 
-        let bodytext = htmlToText(body, {
-          wordwrap: 130,
-          preserveNewlines: true,
-          selectors: [
-            { selector: "div.preview", format: "skip" },
-            { selector: "div.footer", format: "skip" },
-            { selector: "img", format: "skip" },
-            { selector: "style", format: "skip" },
-            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-          ],
-        }).trim();
+      const { payload, internalDate } = msgResponse.data;
+      const headers = payload.headers || [];
 
-        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+      const subjectHeader = headers.find((h: any) => h.name === "Subject");
+      const fromHeader = headers.find((h: any) => h.name === "From");
 
-        return {
-          body: bodytext,
-          subject: subject,
-          timestamp: new Date(Number(internalDate)),
-          from: from,
-        };
-      })
-    );
+      const subject = subjectHeader ? subjectHeader.value : "No Subject";
+      const from = fromHeader ? fromHeader.value : "Unknown Sender";
 
-    const summarizedEmails: Array<any> = [];
-
-    for (const email of unreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
+      let body = "";
+      if (payload.parts) {
+        const textPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/plain"
+        );
+        const htmlPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/html"
+        );
+        body =
+          textPart && textPart.body.data
+            ? decodeBase64Url(textPart.body.data)
+            : htmlPart && htmlPart.body.data
+            ? decodeBase64Url(htmlPart.body.data)
+            : "No readable content";
+      } else if (payload.body && payload.body.data) {
+        body = decodeBase64Url(payload.body.data);
       }
-    }
 
-    return summarizedEmails;
-  } catch (err: any) {
-    console.log(
-      "get google unread emails error:",
-      err.response?.data || err.message || err
+      let bodytext = htmlToText(body, {
+        wordwrap: 130,
+        preserveNewlines: true,
+        selectors: [
+          { selector: "div.preview", format: "skip" },
+          { selector: "div.footer", format: "skip" },
+          { selector: "img", format: "skip" },
+          { selector: "style", format: "skip" },
+          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+        ],
+      }).trim();
+
+      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+      return {
+        body: bodytext,
+        subject: subject,
+        timestamp: new Date(Number(internalDate)),
+        from: from,
+      };
+    })
+  );
+
+  const unreadEmails: Array<any> = [];
+  const emailsToMark: Array<{ id: string }> = [];
+  unreadEmailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      unreadEmails.push(result.value);
+      emailsToMark.push({ id: messages[index].id });
+    } else {
+      logger.error(
+        `Failed to fetch Gmail email ${messages[index].id}:`,
+        result.reason
+      );
+    }
+  });
+
+  // Mark emails as read concurrently, without blocking summarization
+  if (emailsToMark.length > 0) {
+    markGoogleEmailsAsRead(emailsToMark, access_token).catch((err) => {
+      logger.error("Unexpected error occurred", err);
+    });
+  }
+
+  return summarizeEmailArray(unreadEmails);
+};
+
+export const getLatestUnreadGoogleEmails = async (
+  access_token: string,
+  timezone: string
+): Promise<Array<Email>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
+  }
+
+  const now = DateTime.now().setZone(timezone);
+  const twentyFourHoursAgo = now.minus({ hours: 24 }).toUTC();
+  const nowUtc = now.toUTC();
+
+  const after = Math.floor(twentyFourHoursAgo.toSeconds());
+  const before = Math.floor(nowUtc.toSeconds());
+
+  const params = {
+    q: `category:primary is:unread after:${after} before:${before}`,
+    maxResults: 3,
+  };
+
+  const listResponse = await axios
+    .get("https://gmail.googleapis.com/gmail/v1/users/me/messages", {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: params,
+    })
+    .catch((err) => {
+      logger.error("Gmail API list error:", err.response?.data || err.message);
+      throw new Error("Failed to fetch Gmail message list");
+    });
+
+  const messages = listResponse.data.messages || [];
+  if (messages.length === 0) return [];
+
+  const emailResults = await Promise.allSettled(
+    messages.map(async (message: { id: string }) => {
+      const msgResponse = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { format: "full" },
+        }
+      );
+
+      const { payload, internalDate } = msgResponse.data;
+      const headers = payload.headers || [];
+
+      const subjectHeader = headers.find((h: any) => h.name === "Subject");
+      const fromHeader = headers.find((h: any) => h.name === "From");
+
+      const subject = subjectHeader ? subjectHeader.value : "No Subject";
+      const from = fromHeader ? fromHeader.value : "Unknown Sender";
+
+      let body = "";
+      if (payload.parts) {
+        const textPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/plain"
+        );
+        const htmlPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/html"
+        );
+        body =
+          textPart && textPart.body.data
+            ? decodeBase64Url(textPart.body.data)
+            : htmlPart && htmlPart.body.data
+            ? decodeBase64Url(htmlPart.body.data)
+            : "No readable content";
+      } else if (payload.body && payload.body.data) {
+        body = decodeBase64Url(payload.body.data);
+      }
+
+      let bodytext = htmlToText(body, {
+        wordwrap: 130,
+        preserveNewlines: true,
+        selectors: [
+          { selector: "div.preview", format: "skip" },
+          { selector: "div.footer", format: "skip" },
+          { selector: "img", format: "skip" },
+          { selector: "style", format: "skip" },
+          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+        ],
+      }).trim();
+
+      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+      return {
+        body: bodytext,
+        subject: subject,
+        timestamp: new Date(Number(internalDate)),
+        from: from,
+      };
+    })
+  );
+
+  const unreadEmails: Array<any> = [];
+  const emailsToMark: Array<{ id: string }> = [];
+  emailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      unreadEmails.push(result.value);
+      emailsToMark.push({ id: messages[index].id });
+    } else {
+      logger.error(
+        `Failed to fetch Gmail email ${messages[index].id}:`,
+        result.reason
+      );
+    }
+  });
+
+  // Mark emails as read concurrently, without blocking summarization
+  if (emailsToMark.length > 0) {
+    markGoogleEmailsAsRead(emailsToMark, access_token).catch((err) => {
+      logger.error("Unexpected error occurred", err);
+    });
+  }
+
+  return summarizeEmailArray(unreadEmails);
+};
+
+export const getLatestReadGoogleEmails = async (
+  access_token: string,
+  timezone: string
+): Promise<Array<Email>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
+  }
+
+  const now = DateTime.now().setZone(timezone);
+  const twentyFourHoursAgo = now.minus({ hours: 24 }).toUTC();
+  const nowUtc = now.toUTC();
+
+  const after = Math.floor(twentyFourHoursAgo.toSeconds());
+  const before = Math.floor(nowUtc.toSeconds());
+
+  const params = {
+    q: `category:primary -is:unread after:${after} before:${before}`,
+    maxResults: 3,
+  };
+
+  const listResponse = await axios
+    .get("https://gmail.googleapis.com/gmail/v1/users/me/messages", {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: params,
+    })
+    .catch((err) => {
+      logger.error("Gmail API list error:", err.response?.data || err.message);
+      throw new Error("Failed to fetch Gmail message list");
+    });
+
+  const messages = listResponse.data.messages || [];
+  if (messages.length === 0) return [];
+
+  const emailResults = await Promise.allSettled(
+    messages.map(async (message: { id: string }) => {
+      const msgResponse = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { format: "full" },
+        }
+      );
+
+      const { payload, internalDate } = msgResponse.data;
+      const headers = payload.headers || [];
+
+      const subjectHeader = headers.find((h: any) => h.name === "Subject");
+      const fromHeader = headers.find((h: any) => h.name === "From");
+
+      const subject = subjectHeader ? subjectHeader.value : "No Subject";
+      const from = fromHeader ? fromHeader.value : "Unknown Sender";
+
+      let body = "";
+      if (payload.parts) {
+        const textPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/plain"
+        );
+        const htmlPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/html"
+        );
+        body =
+          textPart && textPart.body.data
+            ? decodeBase64Url(textPart.body.data)
+            : htmlPart && htmlPart.body.data
+            ? decodeBase64Url(htmlPart.body.data)
+            : "No readable content";
+      } else if (payload.body && payload.body.data) {
+        body = decodeBase64Url(payload.body.data);
+      }
+
+      let bodytext = htmlToText(body, {
+        wordwrap: 130,
+        preserveNewlines: true,
+        selectors: [
+          { selector: "div.preview", format: "skip" },
+          { selector: "div.footer", format: "skip" },
+          { selector: "img", format: "skip" },
+          { selector: "style", format: "skip" },
+          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+        ],
+      }).trim();
+
+      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+      return {
+        body: bodytext,
+        subject: subject,
+        timestamp: new Date(Number(internalDate)),
+        from: from,
+      };
+    })
+  );
+
+  const unreadEmails: Array<any> = [];
+  const emailsToMark: Array<{ id: string }> = [];
+  emailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      unreadEmails.push(result.value);
+      emailsToMark.push({ id: messages[index].id });
+    } else {
+      logger.error(
+        `Failed to fetch Gmail email ${messages[index].id}:`,
+        result.reason
+      );
+    }
+  });
+
+  // Mark emails as read concurrently, without blocking summarization
+  if (emailsToMark.length > 0) {
+    markGoogleEmailsAsRead(emailsToMark, access_token).catch((err) => {
+      logger.error("Unexpected error occurred", err);
+    });
+  }
+
+  return summarizeEmailArray(unreadEmails);
+};
+
+export const markGoogleEmailsAsRead = async (
+  messageIds: Array<{ id: string }>,
+  access_token: string
+) => {
+  const results = await Promise.allSettled(
+    messageIds.map(async (message: { id: string }) => {
+      await axios.post(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}/modify`,
+        {
+          removeLabelIds: ["UNREAD"],
+        },
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+        }
+      );
+
+      return { success: true };
+    })
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      logger.error(
+        `Failed to make email with id ${messageIds[index].id} as read:`,
+        result.reason
+      );
+    }
+  });
+};
+
+export const deleteSpecificGmail = async (
+  messageId: string,
+  access_token: string
+): Promise<void> => {
+  const response = await axios
+    .delete(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    )
+    .catch((err) => {
+      logger.error("Gmail API list error:", err.response?.data || err.message);
+      throw new Error(`Failed to delete email with id ${messageId}`);
+    });
+
+  // Optional: Check if status code is not 2xx and still throw manually (paranoid check)
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(
+      `Unexpected status code ${response.status} while deleting email with id ${messageId}`
     );
-    return null;
   }
 };
 
@@ -178,119 +499,111 @@ export const getGoogleEmailsFromSpecificSender = async (
   access_token: string,
   searchQuery: string,
   timezone: string
-): Promise<null | any> => {
-  try {
-    const now = DateTime.now().setZone(timezone);
-    const twentyFourHoursAgo = now.minus({ hours: 72 }).toUTC();
-    const nowUtc = now.toUTC();
-
-    const after = Math.floor(twentyFourHoursAgo.toSeconds());
-    const before = Math.floor(nowUtc.toSeconds());
-
-    const params = {
-      q: `"${searchQuery}" category:primary after:${after} before:${before}`,
-      maxResults: 20,
-    };
-
-    const listResponse = await axios.get(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: params,
-      }
-    );
-
-    const messages = listResponse.data.messages || [];
-
-    const unreadEmails = await Promise.all(
-      messages.map(async (message: any) => {
-        const msgResponse = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" },
-          }
-        );
-
-        const { payload, snippet, internalDate } = msgResponse.data;
-        const headers = payload.headers || [];
-
-        const subjectHeader = headers.find((h: any) => h.name === "Subject");
-        const fromHeader = headers.find((h: any) => h.name === "From");
-
-        const subject = subjectHeader ? subjectHeader.value : "No Subject";
-        const from = fromHeader ? fromHeader.value : "Unknown Sender";
-
-        let body = "";
-        if (payload.parts) {
-          const textPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/plain"
-          );
-          const htmlPart = payload.parts.find(
-            (part: any) => part.mimeType === "text/html"
-          );
-          body =
-            textPart && textPart.body.data
-              ? decodeBase64Url(textPart.body.data)
-              : htmlPart && htmlPart.body.data
-              ? decodeBase64Url(htmlPart.body.data)
-              : "No readable content";
-        } else if (payload.body && payload.body.data) {
-          body = decodeBase64Url(payload.body.data);
-        }
-
-        let bodytext = htmlToText(body, {
-          wordwrap: 130,
-          preserveNewlines: true,
-          selectors: [
-            { selector: "div.preview", format: "skip" },
-            { selector: "div.footer", format: "skip" },
-            { selector: "img", format: "skip" },
-            { selector: "style", format: "skip" },
-            { selector: "table.emailSeparator-mtbezJ", format: "skip" },
-          ],
-        }).trim();
-
-        bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
-
-        return {
-          body: bodytext,
-          timestamp: new Date(Number(internalDate)),
-          subject: subject,
-          from: from,
-        };
-      })
-    );
-
-    const summarizedEmails: Array<any> = [];
-
-    for (const email of unreadEmails) {
-      const summary = await summarizeEmailsWithLLM(email.body);
-      if (summary) {
-        summarizedEmails.push({
-          body: summary,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      } else {
-        summarizedEmails.push({
-          body: email.body,
-          subject: email.subject,
-          timestamp: email.timestamp,
-          from: email.from,
-        });
-      }
-    }
-
-    return summarizedEmails;
-  } catch (err: any) {
-    console.log(
-      "get emails using search query Error:",
-      err.response?.data || err.message || err
-    );
-    return null;
+): Promise<Array<Email>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
   }
+
+  const now = DateTime.now().setZone(timezone);
+  const twentyFourHoursAgo = now.minus({ hours: 72 }).toUTC();
+  const nowUtc = now.toUTC();
+
+  const after = Math.floor(twentyFourHoursAgo.toSeconds());
+  const before = Math.floor(nowUtc.toSeconds());
+
+  const params = {
+    q: `"${searchQuery}" category:primary after:${after} before:${before}`,
+    maxResults: 20,
+  };
+
+  const listResponse = await axios
+    .get("https://gmail.googleapis.com/gmail/v1/users/me/messages", {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: params,
+    })
+    .catch((err) => {
+      logger.error("Gmail API list error:", err.response?.data || err.message);
+      throw new Error("Failed to fetch Gmail message list");
+    });
+
+  const messages = listResponse.data.messages || [];
+  if (messages.length === 0) return [];
+
+  const emailResults = await Promise.allSettled(
+    messages.map(async (message: any) => {
+      const msgResponse = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { format: "full" },
+        }
+      );
+
+      const { payload, snippet, internalDate } = msgResponse.data;
+      const headers = payload.headers || [];
+
+      const subjectHeader = headers.find((h: any) => h.name === "Subject");
+      const fromHeader = headers.find((h: any) => h.name === "From");
+
+      const subject = subjectHeader ? subjectHeader.value : "No Subject";
+      const from = fromHeader ? fromHeader.value : "Unknown Sender";
+
+      let body = "";
+      if (payload.parts) {
+        const textPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/plain"
+        );
+        const htmlPart = payload.parts.find(
+          (part: any) => part.mimeType === "text/html"
+        );
+        body =
+          textPart && textPart.body.data
+            ? decodeBase64Url(textPart.body.data)
+            : htmlPart && htmlPart.body.data
+            ? decodeBase64Url(htmlPart.body.data)
+            : "No readable content";
+      } else if (payload.body && payload.body.data) {
+        body = decodeBase64Url(payload.body.data);
+      }
+
+      let bodytext = htmlToText(body, {
+        wordwrap: 130,
+        preserveNewlines: true,
+        selectors: [
+          { selector: "div.preview", format: "skip" },
+          { selector: "div.footer", format: "skip" },
+          { selector: "img", format: "skip" },
+          { selector: "style", format: "skip" },
+          { selector: "table.emailSeparator-mtbezJ", format: "skip" },
+        ],
+      }).trim();
+
+      bodytext = bodytext.replace(/https?:\/\/[^\s]+/g, "").trim();
+
+      return {
+        body: bodytext,
+        timestamp: new Date(Number(internalDate)),
+        subject: subject,
+        from: from,
+      };
+    })
+  );
+
+  const emails: Array<any> = [];
+  const emailsToMark: Array<{ id: string }> = [];
+  emailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      emails.push(result.value);
+      emailsToMark.push({ id: messages[index].id });
+    } else {
+      logger.error(
+        `Failed to fetch Gmail email ${messages[index].id}:`,
+        result.reason
+      );
+    }
+  });
+
+  return summarizeEmailArray(emails);
 };
 
 export const addGoogleCalenderEventFunc = async (
@@ -442,7 +755,7 @@ export const getReplySenderEmailsUsingSearchQuery = async (
 ) => {
   try {
     const now = DateTime.now().setZone(timezone);
-    const twentyFourHoursAgo = now.minus({ days: 30 }).toUTC();
+    const twentyFourHoursAgo = now.minus({ days: 3 }).toUTC();
     const nowUtc = now.toUTC();
 
     const after = Math.floor(twentyFourHoursAgo.toSeconds());
@@ -508,7 +821,7 @@ export const getSenderEmailsUsingSearchQuery = async (
 ) => {
   try {
     const now = DateTime.now().setZone(timezone);
-    const twentyFourHoursAgo = now.minus({ days: 60 }).toUTC();
+    const twentyFourHoursAgo = now.minus({ days: 7 }).toUTC();
     const nowUtc = now.toUTC();
 
     const after = Math.floor(twentyFourHoursAgo.toSeconds());
@@ -549,6 +862,7 @@ export const getSenderEmailsUsingSearchQuery = async (
 
         return {
           from: from,
+          id: message.id,
         };
       })
     );

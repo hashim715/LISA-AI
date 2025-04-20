@@ -26,6 +26,7 @@ import {
   updateGoogleCalendarEventFunc,
   deleteGoogleCalendarEventFunc,
   getGoogleCalenderEvents,
+  deleteSpecificGmail,
 } from "./gmailApi";
 
 import {
@@ -37,6 +38,8 @@ import {
 } from "./outlookApi";
 
 import { DateTime } from "luxon";
+
+import { logger } from "./logger";
 
 export const addGoogleCalenderFunc = async (
   res: Response,
@@ -764,6 +767,54 @@ export const draftOutlookMailReplyFunc = async (
     }
 
     return data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const deleteGoogleGmailFunc = async (
+  text: string,
+  res: Response,
+  user: any
+) => {
+  try {
+    const emailMetaData = await getSenderEmailsUsingSearchQuery(
+      text,
+      user.google_access_token,
+      user.timeZone
+    );
+
+    console.log(emailMetaData);
+
+    const processedSearchQueryEmail = await getMatchingGmail(
+      text,
+      emailMetaData
+    );
+
+    console.log(processedSearchQueryEmail);
+
+    const { id }: { id: string } = JSON.parse(processedSearchQueryEmail);
+
+    if (!id || !id.trim()) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Tell the user i tried to find the reciever email couldn't find it so please specify exactly to whon to send this email",
+      });
+    }
+
+    await deleteSpecificGmail(id, user.google_access_token).catch(
+      (err: unknown): null => {
+        const error = err as any;
+        logger.error(
+          "Gmail delete API error:",
+          error.response?.data || error.message
+        );
+        return null;
+      }
+    );
+
+    return { success: true };
   } catch (err) {
     return null;
   }

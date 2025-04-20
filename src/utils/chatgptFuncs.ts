@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const getChannelNameUsingLLM = async (
   input: string,
@@ -45,27 +45,22 @@ export const getChannelNameUsingLLM = async (
 };
 
 export const summarizeEmailsWithLLM = async (email: string) => {
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful assistant that analyzes email body and provides clear summaries. Focus on key information, main topics, and important points from each email.",
-        },
-        {
-          role: "user",
-          content: `Please provide a summary of this email:\n\n${email}`,
-        },
-      ],
-      model: "gpt-3.5-turbo",
-    });
+  const completion = await openai.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant that analyzes email body and provides clear summaries. Focus on key information, main topics, and important points from each email.",
+      },
+      {
+        role: "user",
+        content: `Please provide a summary of this email:\n\n${email}`,
+      },
+    ],
+    model: "gpt-3.5-turbo",
+  });
 
-    return completion.choices[0].message.content;
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
+  return completion.choices[0].message.content;
 };
 
 export const summarizeNotionWithLLM = async (allContent: any) => {
@@ -114,7 +109,7 @@ export const getGoogleCalenderFieldsUsingLLM = async (
       If a timezone is explicitly mentioned, use that.
       If neither a timezone nor a location is given, default to user's timezone as given.
 
-      Today’s date is: "${today_date}"
+      Today’s date is: “${today_date}”
 
       User's timezone: "${timeZone}"
 
@@ -267,11 +262,11 @@ export const getMatchingCalenderEvent = async (
 export const getDeleteSearchQueryUsingLLM = async (input: string) => {
   try {
     const prompt = `
-Given the following instruction, extract the user's search query—such as a name, description, or location—and return it as a JSON object with the field:
+      Given the following instruction, extract the user's search query—such as a name, description, or location—and return it as a JSON object with the field:
 
-- query
+      - query
 
-Instruction: "${input}"
+      Instruction: "${input}"
 `;
 
     const response = await openai.chat.completions.create({
@@ -340,6 +335,7 @@ export const getMatchingGmail = async (
     const prompt = `
     Extract the following fields from the instruction and return a JSON object:
     - from use email list provided to find a matching email by the name that is provided you in prompt if email is not found then retrun name@example.com.
+    - id
 
     Available emails:
     ${JSON.stringify(emailList)}

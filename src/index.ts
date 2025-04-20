@@ -28,11 +28,12 @@ import {
   getUnreadMessagesFunc,
   getLastReadTimestamp,
 } from "./utils/slackApi";
+import { logger } from "./utils/logger";
 
 dotenv.config();
 
 const app: Application = express();
-const PORT: number = parseInt(process.env.PORT) || 5001;
+const PORT: number = parseInt(process.env.PORT) || 5002;
 
 app.use(express.json());
 app.use(cookieParser());
@@ -335,11 +336,11 @@ export const scheduleUserBriefs = async () => {
 const start = async (): Promise<void> => {
   try {
     server.listen(PORT, (): void => {
-      console.log(`Listening on port ${PORT}`);
+      logger.info(`Listening on port ${PORT}`);
     });
     await scheduleUserBriefs();
   } catch (err) {
-    console.log(err);
+    logger.error(err);
   }
 };
 

@@ -1,5 +1,12 @@
 import { iteratePaginatedAPI, Client } from "@notionhq/client";
-import { BlockObjectResponse } from "@notionhq/client/build/src/api-endpoints";
+import {
+  BlockObjectResponse,
+  PageObjectResponse,
+  PartialDatabaseObjectResponse,
+  PartialPageObjectResponse,
+} from "@notionhq/client/build/src/api-endpoints";
+import { openai } from "./chatgptFuncs";
+import { summarizeNotionWithLLM } from "./chatgptFuncs";
 
 export const getPlainTextFromRichText = (richText: any) => {
   return richText.map((t: any) => t.plain_text).join("");
@@ -277,7 +284,7 @@ function formatBlockContent(block: any, level = 0) {
   return content;
 }
 
-export const formatPageContent = (page: any, blocks: any) => {
+export const formatPageContent = (page: PageObjectResponse, blocks: any) => {
   const pageTitle = getPageTitle(page);
   let content = `Page: ${pageTitle}\nURL: ${page.url}\n\n`;
 
@@ -346,4 +353,187 @@ export const formatPageContent = (page: any, blocks: any) => {
   }
 
   return content;
+};
+
+export const getAllPages = async (notion: Client) => {
+  const pages: Array<any> = [];
+
+  try {
+    for await (const page of iteratePaginatedAPI(notion.search, {
+      filter: {
+        property: "object",
+        value: "page",
+      },
+    })) {
+      pages.push(page);
+    }
+
+    return pages;
+  } catch (error) {
+    return [];
+  }
+};
+
+export const selectTaskListPage = async (
+  pages: Array<PartialPageObjectResponse | PartialDatabaseObjectResponse>
+) => {
+  try {
+    const pageTitles = pages.map((page) => getPageTitle(page));
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that analyzes page titles to identify the most relevant task list or to-do list page. Look for titles that suggest task management, to-do lists, or project tracking.",
+        },
+        {
+          role: "user",
+          content: `Here are the page titles from a Notion workspace:\n\n${pageTitles.join(
+            "\n"
+          )}\n\nPlease identify which page is most likely to be a task list or to-do list. Return only the exact title of the most relevant page.`,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+    });
+
+    const selectedTitle = completion.choices[0].message.content.trim();
+    const selectedIndex = pageTitles.indexOf(selectedTitle);
+
+    if (selectedIndex === -1) {
+      console.log(
+        "No suitable task list page found. Using the first page instead."
+      );
+      return pages[0];
+    }
+
+    return pages[selectedIndex];
+  } catch (error) {
+    console.error("Error selecting task list page:", error);
+    return pages[0]; // Fallback to first page if there's an error
+  }
+};
+
+// New function to select page based on user question
+export const selectPageBasedOnQuestion = async (
+  pages: Array<PageObjectResponse>,
+  question: string
+) => {
+  try {
+    const pageTitles = pages.map((page: PageObjectResponse) =>
+      getPageTitle(page)
+    );
+
+    console.log("Available page titles:", pageTitles);
+    console.log("Question being asked:", question);
+
+    // If the question starts with "Page Title:", extract just the title part
+    let searchTitle = question;
+    if (question.startsWith("Page Title:")) {
+      searchTitle = question.replace("Page Title:", "").trim();
+    }
+
+    // First try direct match
+    const directMatchIndex = pageTitles.findIndex(
+      (title: string) =>
+        title.trim().toLowerCase() === searchTitle.toLowerCase()
+    );
+
+    if (directMatchIndex !== -1) {
+      return { page: pages[directMatchIndex] };
+    }
+
+    // If no direct match, try partial match
+    const partialMatchIndex = pageTitles.findIndex(
+      (title: string) =>
+        title.trim().toLowerCase().includes(searchTitle.toLowerCase()) ||
+        searchTitle.toLowerCase().includes(title.trim().toLowerCase())
+    );
+
+    if (partialMatchIndex !== -1) {
+      return {
+        page: pages[partialMatchIndex],
+        matchedTitle: pageTitles[partialMatchIndex],
+      };
+    }
+
+    // If still no match, try using LLM
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that analyzes page titles to identify which page would be most relevant to answer a user's question. Consider the context and content that would likely be in each page based on its title. Return only the exact title of the most relevant page, or if no page seems relevant, return 'NO_MATCH'.",
+        },
+        {
+          role: "user",
+          content: `Here are the page titles from a Notion workspace:\n\n${pageTitles.join(
+            "\n"
+          )}\n\nUser's question: ${question}\n\nPlease identify which page would be most relevant to answer this question. Return only the exact title of the most relevant page, or 'NO_MATCH' if no page seems relevant.`,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+    });
+
+    const selectedTitle = completion.choices[0].message.content.trim();
+    console.log("Selected title from LLM:", selectedTitle);
+
+    if (selectedTitle === "NO_MATCH") {
+      return { error: "No page seems directly relevant to the question." };
+    }
+
+    const selectedIndex = pageTitles.findIndex(
+      (title: string) =>
+        title.trim().toLowerCase() === selectedTitle.toLowerCase()
+    );
+
+    if (selectedIndex === -1) {
+      return {
+        error: "Selected page title does not match any available pages.",
+      };
+    }
+
+    return { page: pages[selectedIndex] };
+  } catch (error) {
+    console.error("Error in selectPageBasedOnQuestion:", error);
+    return { error: `Error selecting page: ${error.message}` };
+  }
+};
+
+// New function to handle the search process
+export const searchNotion = async (question: string, notion: Client) => {
+  try {
+    // Get all pages
+    const pages = await getAllPages(notion);
+
+    if (pages.length === 0) {
+      return { error: "No pages found in the workspace." };
+    }
+
+    // Select the most relevant page based on the question
+    const selectionResult = await selectPageBasedOnQuestion(pages, question);
+
+    if (selectionResult.error) {
+      return selectionResult;
+    }
+
+    const selectedPage = selectionResult.page;
+    const pageTitle = getPageTitle(selectedPage);
+
+    // Process the selected page
+    const blocks = await retrieveBlockChildren(selectedPage.id, 0, notion);
+    const pageContent = formatPageContent(selectedPage, blocks);
+
+    // Generate summary
+    const summary = await summarizeNotionWithLLM(pageContent);
+
+    return {
+      pageTitle,
+      pageUrl: selectedPage.url,
+      summary,
+      matchedTitle: selectionResult.matchedTitle,
+    };
+  } catch (error) {
+    return { error: `Error processing content: ${error.message}` };
+  }
 };

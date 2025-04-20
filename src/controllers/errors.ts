@@ -1,9 +1,10 @@
 import { Response } from "express";
 
-export const internalServerError = (res: Response) => {
-  return res
-    .status(500)
-    .json({ success: false, message: "Something went wrong" });
+export const internalServerError = (
+  res: Response,
+  messaeg: string = "Something went wrong"
+) => {
+  return res.status(500).json({ success: false, message: messaeg });
 };
 
 export const forbiddenResponse = (res: Response) => {
@@ -18,10 +19,16 @@ export const confictResponse = (res: Response, message: string) => {
   return res.status(409).json({ success: false, message: message });
 };
 
-export const notFoundResponse = (res: Response) => {
-  return res.status(404).json({ success: false, message: "not found" });
+export const notFoundResponse = (
+  res: Response,
+  message: string = "not found"
+) => {
+  return res.status(404).json({ success: false, message: message });
 };
 
-export const unauthorizedErrorResponse = (res: Response) => {
-  return res.status(401).json({ success: false, message: "unauthorized" });
+export const unauthorizedErrorResponse = (
+  res: Response,
+  message: string = "unauthorized"
+) => {
+  return res.status(401).json({ success: false, message: message });
 };

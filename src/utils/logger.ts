@@ -8,7 +8,7 @@ if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-const logger = winston.createLogger({
+export const logger = winston.createLogger({
   level: "info",
   format: winston.format.combine(
     winston.format.timestamp(),
@@ -22,5 +22,3 @@ const logger = winston.createLogger({
     new winston.transports.Console(),
   ],
 });
-
-export default logger;

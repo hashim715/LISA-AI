@@ -7,7 +7,10 @@ import {
   internalServerError,
   unauthorizedErrorResponse,
   notFoundResponse,
+  badRequestResponse,
 } from "../controllers/errors";
+import { JwtPayload } from "../utils/types";
+import { logger } from "../utils/logger";
 
 dotenv.config();
 
@@ -19,13 +22,21 @@ export const protectAgent: RequestHandler = async (
   let { token }: { token: string } = req.body;
 
   if (!token) {
-    return unauthorizedErrorResponse(res);
+    return unauthorizedErrorResponse(res, "Authentication token missing");
   }
 
   try {
     const verify = jwt.verify(token, process.env.JWT_SECRET_REFRESH);
 
-    const { username }: { username: string } = jwt_decode(token);
+    // Decode token
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt_decode<JwtPayload>(token);
+    } catch (err) {
+      return badRequestResponse(res, "Invalid authentication token");
+    }
+
+    const { username }: { username: string } = decoded;
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
@@ -37,9 +48,11 @@ export const protectAgent: RequestHandler = async (
 
     next();
   } catch (err) {
-    console.log(err);
+    logger.error("Error in agentMiddleware:", err);
     if (!res.headersSent) {
-      return internalServerError(res);
+      return internalServerError(res, "Failed to validate token");
     }
+  } finally {
+    await prisma.$disconnect();
   }
 };

@@ -9,10 +9,11 @@ import {
 } from "./errors";
 import { Client } from "@notionhq/client";
 import {
-  extractDatabaseContent,
-  getPageTitle,
   retrieveBlockChildren,
   formatPageContent,
+  getAllPages,
+  selectTaskListPage,
+  searchNotion,
 } from "../utils/notionFuncs";
 import {
   getChannelNameUsingLLM,
@@ -31,6 +32,8 @@ import {
   getGoogleEmails,
   getGoogleCalenderEvents,
   getGoogleEmailsFromSpecificSender,
+  getLatestReadGoogleEmails,
+  getLatestUnreadGoogleEmails,
 } from "../utils/gmailApi";
 import {
   getOutlookEmails,
@@ -46,6 +49,7 @@ import {
   draftOutlookMailReplyFunc,
   updateGoogleCalenderFunc,
   deleteGoogleCalenderFunc,
+  deleteGoogleGmailFunc,
 } from "../utils/controllerFuncs";
 import { scheduleUserBriefs } from "../index";
 import { validatePhoneNumber } from "../utils/validatePhoneNumber";
@@ -55,6 +59,8 @@ import {
   areaCodeToTimeZone,
   regionToTimeZone,
 } from "../utils/allStateTimeZones";
+import { logger } from "../utils/logger";
+import { Email } from "../utils/types";
 
 export const getUnreadEmails: RequestHandler = async (
   req: Request,
@@ -68,45 +74,68 @@ export const getUnreadEmails: RequestHandler = async (
 
     const user = await prisma.user.findFirst({ where: { username: username } });
 
-    let google_emails: Array<any> = [];
-    let outlook_emails: Array<any> = [];
+    // Fetch emails concurrently with Promise.allSettled
+    const emailFetchResults = await Promise.allSettled([
+      user.google_login && user.google_access_token
+        ? getGoogleEmails(user.google_access_token, user.timeZone)
+        : Promise.resolve([]),
+      user.outlook_login && user.outlook_access_token
+        ? getOutlookEmails(user.outlook_access_token)
+        : Promise.resolve([]),
+    ]);
 
-    if (user.google_login) {
-      google_emails = await getGoogleEmails(
-        user.google_access_token,
-        user.timeZone
-      );
-
-      if (!google_emails) {
-        return badRequestResponse(res, "No emails found");
-      }
-    }
-
-    if (user.outlook_login) {
-      outlook_emails = await getOutlookEmails(user.outlook_access_token);
-
-      if (!outlook_emails) {
-        return badRequestResponse(res, "No emails found");
-      }
-    }
-
-    return res.status(200).json({
+    // Process results
+    const response: {
+      success: boolean;
+      google_emails: Array<Email>;
+      outlook_emails: Array<Email>;
+      message?: string;
+      failedServices?: string[];
+    } = {
       success: true,
-      google_emails: user.google_login
-        ? google_emails.length > 0
-          ? google_emails
-          : "No unread emails in your gmail account"
-        : [],
-      outlook_emails: user.outlook_login
-        ? outlook_emails.length > 0
-          ? outlook_emails
-          : "No unread emails in your outlook account"
-        : [],
-    });
-  } catch (err) {
-    if (!res.headersSent) {
-      return internalServerError(res);
+      google_emails: [],
+      outlook_emails: [],
+    };
+
+    const failedServices: string[] = [];
+    emailFetchResults.forEach(
+      (result: PromiseSettledResult<Email[]>, index: number) => {
+        if (result.status === "fulfilled") {
+          if (index === 0) {
+            response.google_emails = result.value;
+          } else {
+            response.outlook_emails = result.value;
+          }
+        } else {
+          const service = index === 0 ? "Google" : "Outlook";
+          logger.error(`${service} email fetch error:`, result.reason);
+          failedServices.push(service);
+        }
+      }
+    );
+
+    // Add message if no emails or no accounts connected
+    if (
+      response.google_emails.length === 0 &&
+      response.outlook_emails.length === 0 &&
+      (!user.google_login || !user.outlook_login)
+    ) {
+      response.message =
+        "No unread emails found or no email accounts connected";
     }
+
+    if (failedServices.length > 0) {
+      response.failedServices = failedServices;
+    }
+
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error("Error in getUnreadEmails:", err);
+    if (!res.headersSent) {
+      return internalServerError(res, "Failed to fetch emails");
+    }
+  } finally {
+    await prisma.$disconnect();
   }
 };
 
@@ -128,49 +157,202 @@ export const getEmailsUsingSearchQuery: RequestHandler = async (
       return badRequestResponse(res, "please provide a valid search query.");
     }
 
-    let google_emails: Array<any> = [];
-    let outlook_emails: Array<any> = [];
+    // Fetch emails concurrently with Promise.allSettled
+    const emailFetchResults = await Promise.allSettled([
+      user.google_login && user.google_access_token
+        ? getGoogleEmailsFromSpecificSender(
+            user.google_access_token,
+            searchField.trim(),
+            user.timeZone
+          )
+        : Promise.resolve([]),
+      user.outlook_login && user.outlook_access_token
+        ? getOutlookEmailsFromSpecificSender(
+            user.outlook_access_token,
+            searchField.trim()
+          )
+        : Promise.resolve([]),
+    ]);
 
-    if (user.google_login) {
-      google_emails = await getGoogleEmailsFromSpecificSender(
-        user.google_access_token,
-        searchField.trim(),
-        user.timeZone
-      );
-
-      if (!google_emails) {
-        return badRequestResponse(res, "No emails found");
-      }
-    }
-
-    if (user.outlook_login) {
-      outlook_emails = await getOutlookEmailsFromSpecificSender(
-        user.outlook_access_token,
-        searchField.trim()
-      );
-
-      if (!outlook_emails) {
-        return badRequestResponse(res, "No emails found");
-      }
-    }
-
-    return res.status(200).json({
+    // Process results
+    const response: {
+      success: boolean;
+      google_emails: Array<Email>;
+      outlook_emails: Array<Email>;
+      message?: string;
+      failedServices?: string[];
+    } = {
       success: true,
-      google_emails: user.google_login
-        ? google_emails.length > 0
-          ? google_emails
-          : "No emails found for this name"
-        : [],
-      outlook_emails: user.outlook_login
-        ? outlook_emails.length > 0
-          ? outlook_emails
-          : "No emails found for this name"
-        : [],
-    });
-  } catch (err) {
-    if (!res.headersSent) {
-      return internalServerError(res);
+      google_emails: [],
+      outlook_emails: [],
+    };
+
+    const failedServices: string[] = [];
+    emailFetchResults.forEach(
+      (result: PromiseSettledResult<Email[]>, index: number) => {
+        if (result.status === "fulfilled") {
+          if (index === 0) {
+            response.google_emails = result.value;
+          } else {
+            response.outlook_emails = result.value;
+          }
+        } else {
+          const service = index === 0 ? "Google" : "Outlook";
+          logger.error(`${service} email fetch error:`, result.reason);
+          failedServices.push(service);
+        }
+      }
+    );
+
+    // Add message if no emails or no accounts connected
+    if (
+      response.google_emails.length === 0 &&
+      response.outlook_emails.length === 0 &&
+      (!user.google_login || !user.outlook_login)
+    ) {
+      response.message =
+        "No unread emails found or no email accounts connected";
     }
+
+    if (failedServices.length > 0) {
+      response.failedServices = failedServices;
+    }
+
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error("Error in getEmailsFromSpecificSender:", err);
+    if (!res.headersSent) {
+      return internalServerError(
+        res,
+        "Failed to fetch emails from specific sender"
+      );
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+export const deleteGoogleGmail: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    const { text }: { text: string } = req.body;
+
+    if (!text || !text.trim()) {
+      return badRequestResponse(res, "please provide valid input");
+    }
+
+    const data = await deleteGoogleGmailFunc(text, res, user);
+
+    if (!data) {
+      return badRequestResponse(res, "failed to delete email");
+    }
+
+    return res
+      .status(200)
+      .json({ success: true, message: "email deleted successfully" });
+  } catch (err) {
+    logger.error("Error in deleteGoogleEmail:", err);
+    if (!res.headersSent) {
+      return internalServerError(res, "Failed to delete email");
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+export const getLatestEmails: RequestHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.authToken;
+
+    const { username }: { username: string } = jwt_decode(token);
+
+    const user = await prisma.user.findFirst({ where: { username: username } });
+
+    // Fetch emails concurrently
+    const results = await Promise.allSettled([
+      user.google_login && user.google_access_token
+        ? getLatestUnreadGoogleEmails(user.google_access_token, user.timeZone)
+        : Promise.resolve([]),
+      user.google_login && user.google_access_token
+        ? getLatestReadGoogleEmails(user.google_access_token, user.timeZone)
+        : Promise.resolve([]),
+      user.outlook_login && user.outlook_access_token
+        ? getOutlookEmails(user.outlook_access_token)
+        : Promise.resolve([]),
+    ]);
+
+    // Process results
+    const response: {
+      success: boolean;
+      google_unread_emails: Array<Email>;
+      google_read_emails: Array<Email>;
+      outlook_emails: Array<Email>;
+      message?: string;
+      failedServices?: string[];
+    } = {
+      success: true,
+      google_unread_emails: [],
+      google_read_emails: [],
+      outlook_emails: [],
+    };
+
+    // Map promises to services for clarity and scalability
+    const serviceMap = [
+      { name: "Google Unread Emails", key: "google_unread_emails" },
+      { name: "Google Read Emails", key: "google_read_emails" }, // Optional
+      { name: "Outlook Emails", key: "outlook_emails" },
+    ];
+
+    const failedServices: string[] = [];
+    results.forEach((result: PromiseSettledResult<Email[]>, index: number) => {
+      const service = serviceMap[index];
+      if (result.status === "fulfilled") {
+        (response as any)[service.key] = result.value || [];
+      } else {
+        logger.error(`${service.name} fetch error:`, {
+          error: result.reason.message || "Unknown error",
+          status: result.reason.response?.status,
+        });
+        failedServices.push(service.name);
+      }
+    });
+
+    // Check if no emails were fetched
+    if (
+      response.google_unread_emails.length === 0 &&
+      response.google_read_emails.length === 0 &&
+      response.outlook_emails.length === 0 &&
+      (!user.google_login || !user.outlook_login)
+    ) {
+      response.message =
+        "No unread emails found or no email accounts connected";
+    }
+
+    if (failedServices.length > 0) {
+      response.failedServices = failedServices;
+    }
+
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error("Error in getLatestUnreadEmails:", err);
+    if (!res.headersSent) {
+      return internalServerError(res, "Failed to fetch latest emails");
+    }
+  } finally {
+    await prisma.$disconnect();
   }
 };
 
@@ -273,36 +455,15 @@ export const notionDataApi: RequestHandler = async (
       return badRequestResponse(res, "User is not connected with notion");
     }
 
+    const { question }: { question: string } = req.body;
+
+    if (!question || !question.trim()) {
+      return badRequestResponse(res, "please provide valid inputs");
+    }
+
     const notion = new Client({ auth: user.notion_access_token });
 
-    const searchResponse = await notion.search({
-      filter: {
-        value: "page",
-        property: "object",
-      },
-    });
-
-    let allContent = "";
-
-    for (const item of searchResponse.results as any) {
-      if (item.object === "database") {
-        const databaseContent = await extractDatabaseContent(item.id, notion);
-        allContent += databaseContent + "\n\n";
-      } else if (item.object === "page") {
-        const pageTitle = getPageTitle(item);
-
-        const blocks = await retrieveBlockChildren(item.id, 0, notion);
-        const pageContent = formatPageContent(item, blocks);
-        allContent += pageContent + "\n\n---\n\n";
-      }
-    }
-
-    console.log("\nGenerating summary...");
-    const summary = await summarizeNotionWithLLM(allContent);
-    if (!summary) {
-      return badRequestResponse(res, "Try again something went wrong");
-    }
-    console.log("\nDone generating summary...");
+    const summary = await searchNotion(question, notion);
 
     return res.status(200).json({ success: true, message: summary });
   } catch (err) {
@@ -439,33 +600,22 @@ export const getMorningUpdate: RequestHandler = async (
     let notion_summary = null;
 
     if (user.notion_login) {
-      const notion = new Client({ auth: user.notion_access_token });
+      const notion: Client = new Client({ auth: user.notion_access_token });
 
-      const searchResponse = await notion.search({
-        filter: {
-          value: "page",
-          property: "object",
-        },
-      });
+      console.log("Searching for all accessible pages...");
+      const pages: Array<any> = await getAllPages(notion);
 
-      let allContent = "";
-
-      for (const item of searchResponse.results as any) {
-        if (item.object === "database") {
-          const databaseContent = await extractDatabaseContent(item.id, notion);
-          allContent += databaseContent + "\n\n";
-        } else if (item.object === "page") {
-          const pageTitle = getPageTitle(item);
-
-          const blocks = await retrieveBlockChildren(item.id, 0, notion);
-          const pageContent = formatPageContent(item, blocks);
-          allContent += pageContent + "\n\n---\n\n";
-        }
+      if (pages.length === 0) {
+        console.log("No pages found in the workspace.");
+        return;
       }
 
-      console.log("\nGenerating summary...");
-      notion_summary = await summarizeNotionWithLLM(allContent);
-      console.log("\nDone generating summary...");
+      const selectedPage: any = await selectTaskListPage(pages);
+
+      const blocks = await retrieveBlockChildren(selectedPage.id, 0, notion);
+      const pageContent = formatPageContent(selectedPage, blocks);
+
+      notion_summary = await summarizeNotionWithLLM(pageContent);
     }
 
     if (user.slack_login) {

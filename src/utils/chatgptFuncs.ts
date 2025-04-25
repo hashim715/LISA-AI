@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { Email } from "./types";
 
 export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -63,28 +64,23 @@ export const summarizeEmailsWithLLM = async (email: string) => {
   return completion.choices[0].message.content;
 };
 
-export const summarizeNotionWithLLM = async (allContent: any) => {
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful assistant that analyzes Notion page content and provides clear summaries. Focus on key information, main topics, and important points from each page.",
-        },
-        {
-          role: "user",
-          content: `Please provide a summary of these Notion pages:\n\n${allContent}`,
-        },
-      ],
-      model: "gpt-3.5-turbo",
-    });
+export const summarizeNotionWithLLM = async (allContent: string) => {
+  const completion = await openai.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant that analyzes Notion page content and provides clear summaries. Focus on key information, main topics, and important points from each page.",
+      },
+      {
+        role: "user",
+        content: `Please provide a summary of these Notion pages:\n\n${allContent}`,
+      },
+    ],
+    model: "gpt-3.5-turbo",
+  });
 
-    return completion.choices[0].message.content;
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
+  return completion.choices[0].message.content || "";
 };
 
 export const getGoogleCalenderFieldsUsingLLM = async (
@@ -290,8 +286,7 @@ export const getDeleteSearchQueryUsingLLM = async (input: string) => {
 };
 
 export const getGmailDraftFieldsUsingLLM = async (input: string) => {
-  try {
-    const prompt = `
+  const prompt = `
     Extract the following fields from the instruction and return a JSON object:
     - name
     - subject
@@ -306,33 +301,28 @@ export const getGmailDraftFieldsUsingLLM = async (input: string) => {
     Instruction: "${input}"
     `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You extract email fields from user instructions for creating Gmail drafts.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0,
-      response_format: { type: "json_object" },
-    });
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You extract email fields from user instructions for creating Gmail drafts.",
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0,
+    response_format: { type: "json_object" },
+  });
 
-    return response.choices[0].message.content;
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
+  return response.choices[0].message.content;
 };
 
 export const getMatchingGmail = async (
   input: string,
-  emailList: Array<any>
-) => {
-  try {
-    const prompt = `
+  emailList: Array<Email>
+): Promise<string | null> => {
+  const prompt = `
     Extract the following fields from the instruction and return a JSON object:
     - from use email list provided to find a matching email by the name that is provided you in prompt if email is not found then retrun name@example.com.
     - id
@@ -343,25 +333,21 @@ export const getMatchingGmail = async (
     Instruction: "${input}"
     `;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You extract email fields from user instructions for creating Gmail drafts.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0,
-      response_format: { type: "json_object" },
-    });
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You extract email fields from user instructions for creating Gmail drafts.",
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0,
+    response_format: { type: "json_object" },
+  });
 
-    return response.choices[0].message.content;
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
+  return response.choices[0].message.content;
 };
 
 export const getReplyGmailDraftFieldsUsingLLM = async (input: string) => {
@@ -618,4 +604,83 @@ export const getMatchingReplyOutlookMail = async (
     console.log(err);
     return null;
   }
+};
+
+export const getSearchNewsQueryFromMorningPreferences = async (
+  morning_preferences: string
+) => {
+  const prompt = `
+    These are the user preferences: ${morning_preferences} from a user for the morning update. From these preferences, remove any part which is talking about events and only filter out the parts that are talking about any news.
+
+    Example 1, if the user preference is: "Web 3 events in San Fransisco and most Latest Research Papers in Natural Language Processing", you should filter it out to "Latest Research Papers in Natural Language Processing"
+
+    Example 2, if the user preference is: "Hackathons in New York and Latest News in AI", you should filter it out to "Latest News in AI"
+
+    just return the query result don't include words like query: or search:
+
+    If there is no news piece that you can filter out, just return empty string
+  `;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      {
+        role: "system",
+        content: "You extract search query from the given instruction",
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+
+  return response.choices[0].message.content || "";
+};
+
+export const getEventsFromMorningPreferences = async (
+  morning_preferences: string
+) => {
+  const prompt = `
+      These are the user preferences: ${morning_preferences} from a user for the morning update. From these preferences, remove any part which is talking about news and only filter out the parts that are talking about any events. 
+
+      Example 1, if the user preference is: "Web 3 events in San Fransisco and most Latest Research Papers in Natural Language Processing", you should filter it out to "Web 3 events in San Fransisco"
+
+      Example 2, if the user preference is: "Hackathons in New York and Latest News in AI", you should filter it out to "Hackathons in New York"
+
+      I there is no events piece that you can filter out, just return empty string
+  `;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      {
+        role: "system",
+        content: "You extract events from the user morning pereferences.",
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+
+  return response.choices[0].message.content || "";
+};
+
+export const getrelevantEventsFromMorningPreferences = async (
+  user_events: string,
+  events: string
+) => {
+  const prompt = `
+      These are the types of events the user wants: ${user_events} and these are the events happening tomorrow: ${events}
+      Find top two most relevant events. If you think none of them are relevant, just return empty string.
+  `;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      {
+        role: "system",
+        content: "You extract events from the user morning pereferences.",
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+
+  return response.choices[0].message.content || "";
 };

@@ -1,0 +1,192 @@
+.contact-us-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Archivo', sans-serif;
+}
+
+.contact-header {
+  text-align: center;
+  margin-bottom: 20px;
+  margin-top: 80px;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.contact-us-text {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.company-name {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #b8b8b8;
+}
+
+.the-login-button {
+  cursor: pointer;
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  width: 170px;
+  height: 44px;
+  padding: 0px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e5e5e5;
+  box-sizing: border-box;
+  border-radius: 100000px;
+  background-color: black;
+  color: white;
+  font-size: 14px;
+  font-family: "Archivo";
+  font-weight: 500;
+  line-height: 23px;
+  outline: none;
+ }
+
+
+.contact-header h1 {
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.contact-header p {
+  font-size: 16px;
+  color: #666;
+}
+
+.contact-content {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.contact-form {
+  width: 100%;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Archivo';
+  color: #333;
+  background-color: white;
+  transition: border-color 0.2s ease;
+}
+
+.form-group textarea {
+  height: 350px;
+  resize: vertical;
+  margin-bottom: 40px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.submit-button {
+  cursor: pointer;
+  width: 163px;
+  height: 40px;
+  margin: 20px auto;
+  padding: 0px 8px;
+  display: block;
+  border: 0;
+  box-sizing: border-box;
+  border-radius: 25px;
+  box-shadow: 0px 0px 10px rgba(3,3,3,0.1);
+  background-color: black;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: "Archivo";
+  font-weight: 500;
+  line-height: 16px;
+  outline: none;
+  transition: background-color 0.2s ease;
+}
+
+.submit-button:hover {
+  background-color: #0062cc;
+}
+
+.contact-info {
+  width: 100%;
+  padding: 30px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 20px;
+  margin-left: 40px;
+}
+
+.contact-info h2 {
+  font-size: 20px;
+  color: #333;
+  margin-bottom: 20px;
+  margin-left: 0;
+}
+
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contact-details p {
+  font-size: 16px;
+  color: #333;
+  line-height: 1.6;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.contact-details p br {
+  display: none;
+}
+
+.contact-details p a {
+  margin: 0 5px;
+}
+
+.email-link {
+  color: #007aff;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.email-link:hover {
+  color: #0062cc;
+}
+
+@media (max-width: 768px) {
+  .contact-content {
+    gap: 30px;
+  }
+} 

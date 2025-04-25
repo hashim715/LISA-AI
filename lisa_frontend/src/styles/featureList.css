@@ -1,0 +1,40 @@
+.feature-list {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+    height: 24px; /* Set a fixed height to prevent layout shifts */
+  }
+  
+  .typing-text {
+    color: #007AFF;
+    font-size: 24px;
+    font-family: "Archivo";
+    font-weight: 400;
+    line-height: 32px;
+  }
+  
+  .cursor {
+    display: inline-block;
+    margin-left: 2px;
+    animation: blink 1s infinite;
+  }
+  
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Media Queries for Responsive Text Size */
+  @media screen and (max-width: 768px) {
+    .typing-text {
+      font-size: 20px;
+      line-height: 28px;
+    }
+  }
+
+  @media screen and (max-width: 480px) {
+    .typing-text {
+      font-size: 18px;
+      line-height: 24px;
+    }
+  }

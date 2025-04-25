@@ -19,9 +19,9 @@ export const refreshGoogleAccessToken = async (
     const response = await axios.post(
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
         refresh_token: refresh_token,
         grant_type: "refresh_token",
       }),
@@ -31,7 +31,7 @@ export const refreshGoogleAccessToken = async (
     );
 
     return response.data;
-  } catch (err) {
+  } catch (err: any) {
     console.log(err.response.data);
     return null;
   }
@@ -44,9 +44,9 @@ export const refreshOutlookAccessToken = async (
     const response = await axios.post(
       "https://login.microsoftonline.com/common/oauth2/v2.0/token",
       new URLSearchParams({
-        client_id: process.env.OUTLOOK_CLIENT_ID,
-        client_secret: process.env.OUTLOOK_CLIENT_SECRET,
-        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        client_id: process.env.OUTLOOK_CLIENT_ID || "",
+        client_secret: process.env.OUTLOOK_CLIENT_SECRET || "",
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI || "",
         refresh_token: refresh_token,
         grant_type: "refresh_token",
       }),
@@ -54,7 +54,7 @@ export const refreshOutlookAccessToken = async (
     );
 
     return response.data;
-  } catch (err) {
+  } catch (err: any) {
     console.log(err.response.data);
     return null;
   }
@@ -81,13 +81,13 @@ export const refreshAccessToken: RequestHandler = async (
 
     if (user.google_login) {
       const currentDate = new Date();
-      const expiryDate = new Date(user.google_token_expiry);
+      const expiryDate = new Date(user.google_token_expiry || "");
 
       const isExpired: boolean = expiryDate < currentDate;
 
       if (isExpired) {
         const google_token_data = await refreshGoogleAccessToken(
-          user.google_refresh_token
+          user.google_refresh_token || ""
         );
 
         if (!google_token_data) {
@@ -111,13 +111,13 @@ export const refreshAccessToken: RequestHandler = async (
 
     if (user.outlook_login) {
       const currentDate = new Date();
-      const expiryDate = new Date(user.outlook_token_expiry);
+      const expiryDate = new Date(user.outlook_token_expiry || "");
 
       const isExpired: boolean = expiryDate < currentDate;
 
       if (isExpired) {
         const outlook_token_data = await refreshOutlookAccessToken(
-          user.outlook_refresh_token
+          user.outlook_refresh_token || ""
         );
 
         if (!outlook_token_data) {

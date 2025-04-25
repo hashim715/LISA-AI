@@ -85,7 +85,7 @@ export const getOutlookEmails = async (
     }
 
     return summarizedEmails;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook unread emails error:",
       err.response?.data || err.message || err
@@ -155,7 +155,7 @@ export const getOutlookCalenderEvents = async (
     });
 
     return eventsData;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook calender events error:",
       err.response?.data || err.message || err
@@ -254,7 +254,7 @@ export const getOutlookEmailsFromSpecificSender = async (
     }
 
     return summarizedEmails;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook emails using search query error:",
       err.response?.data || err.message || err
@@ -295,7 +295,7 @@ export const addOutlookCalendarEvent = async (
     );
 
     return response.data;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook emails using search query error:",
       err.response?.data || err.message || err
@@ -336,7 +336,7 @@ export const createOutlookMailDraft = async (
     );
 
     return response.data;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook emails using search query error:",
       err.response?.data || err.message || err
@@ -381,7 +381,7 @@ export const createOutlookReplyDraft = async (
     );
 
     return response.data;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook emails using search query error:",
       err.response?.data || err.message || err
@@ -441,7 +441,7 @@ export const getReplySenderOutlookEmailsUsingSearchQuery = async (
     });
 
     return outlookUnreadEmails;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook emails using search query error:",
       err.response?.data || err.message || err
@@ -500,7 +500,7 @@ export const getSenderOutlookEmailsUsingSearchQuery = async (
     });
 
     return outlookUnreadEmails;
-  } catch (err) {
+  } catch (err: any) {
     console.log(
       "get outlook emails using search query error:",
       err.response?.data || err.message || err

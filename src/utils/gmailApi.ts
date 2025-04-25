@@ -4,7 +4,7 @@ import { htmlToText } from "html-to-text";
 import { summarizeEmailsWithLLM } from "./chatgptFuncs";
 import base64url from "base64url";
 import { DateTime } from "luxon";
-import { Email } from "./types";
+import { Email, CalenderEvent } from "./types";
 import { logger } from "./logger";
 
 // Shared email summarization function
@@ -15,7 +15,7 @@ const summarizeEmailArray = async (
 
   const summarizedEmailResults = await Promise.allSettled(
     emails.map(async (email) => {
-      const summary = await summarizeEmailsWithLLM(email.body);
+      const summary = await summarizeEmailsWithLLM(email.body || "");
       return {
         ...email,
         body: summary || email.body,
@@ -130,7 +130,7 @@ export const getGoogleEmails = async (
     })
   );
 
-  const unreadEmails: Array<any> = [];
+  const unreadEmails: Array<Email> = [];
   const emailsToMark: Array<{ id: string }> = [];
   unreadEmailResults.forEach((result, index) => {
     if (result.status === "fulfilled") {
@@ -433,30 +433,36 @@ export const deleteSpecificGmail = async (
     )
     .catch((err) => {
       logger.error("Gmail API list error:", err.response?.data || err.message);
-      throw new Error(`Failed to delete email with id ${messageId}`);
+      throw new Error(`Failed to delete email with id ${messageId} try again`);
     });
 
   // Optional: Check if status code is not 2xx and still throw manually (paranoid check)
   if (response.status < 200 || response.status >= 300) {
-    throw new Error(
-      `Unexpected status code ${response.status} while deleting email with id ${messageId}`
-    );
+    throw new Error(`Failed to delete email with id ${messageId} try again`);
   }
 };
 
 export const getGoogleCalenderEvents = async (
   access_token: string,
   timezone: string
-): Promise<null | any> => {
-  try {
-    const now = DateTime.now().setZone(timezone);
-    const sevenDaysLater = now.plus({ days: 7 });
+): Promise<Array<CalenderEvent>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
+  }
 
-    // Convert both to UTC ISO format (required by Google Calendar API)
-    const timeMin = now.toUTC().toISO();
-    const timeMax = sevenDaysLater.toUTC().toISO();
+  const now = DateTime.now().setZone(timezone);
+  const sevenDaysLater = now.plus({ days: 7 });
 
-    const response = await axios.get(
+  // Convert both to UTC ISO format (required by Google Calendar API)
+  const timeMin = now.toUTC().toISO();
+  const timeMax = sevenDaysLater.toUTC().toISO();
+
+  if (!timeMin || !timeMax) {
+    throw new Error("Failed to convert time to ISO format");
+  }
+
+  const response = await axios
+    .get(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
         timeMin
       )}&timeMax=${encodeURIComponent(
@@ -468,9 +474,17 @@ export const getGoogleCalenderEvents = async (
           Authorization: `Bearer ${access_token}`,
         },
       }
-    );
+    )
+    .catch((err) => {
+      logger.error(
+        "Google Calender API list error:",
+        err.response?.data || err.message
+      );
+      throw new Error(`Failed to fetch google calender events`);
+    });
 
-    const eventsData: Array<any> = response.data.items.map((item: any) => ({
+  const eventsData: Array<CalenderEvent> = response.data.items.map(
+    (item: any) => ({
       id: item.id,
       title: item.summary || "No Title", // Event title
       description: item.description || "No Description", // Event description
@@ -483,16 +497,10 @@ export const getGoogleCalenderEvents = async (
             responseStatus: attendee.responseStatus || "needsAction",
           }))
         : [],
-    }));
+    })
+  );
 
-    return eventsData;
-  } catch (err: any) {
-    console.log(
-      "get Google Calendar Error:",
-      err.response?.data || err.message || err
-    );
-    return null;
-  }
+  return eventsData;
 };
 
 export const getGoogleEmailsFromSpecificSender = async (
@@ -611,9 +619,9 @@ export const addGoogleCalenderEventFunc = async (
   summary: string,
   description: string,
   location: string,
-  start: any,
-  end: any,
-  attendees: any
+  start: { dateTime: string; timeZone: string },
+  end: { dateTime: string; timeZone: string },
+  attendees: Array<{ email: string }>
 ) => {
   const calendarId = "primary";
   const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`;
@@ -630,19 +638,22 @@ export const addGoogleCalenderEventFunc = async (
     },
   };
 
-  try {
-    const response = await axios.post(apiUrl, event, {
+  const response = await axios
+    .post(apiUrl, event, {
       headers: {
         Authorization: `Bearer ${access_token}`,
         "Content-Type": "application/json",
       },
+    })
+    .catch((err) => {
+      logger.error(
+        "Failed to add google calender event:",
+        err.response?.data || err.message
+      );
+      throw new Error("Failed to add google calender event");
     });
 
-    return response.data;
-  } catch (error: any) {
-    console.log("Error creating event:", error.response?.data || error.message);
-    return null;
-  }
+  return response.data;
 };
 
 export const createGmailDraft = async (
@@ -674,23 +685,22 @@ export const createGmailDraft = async (
     },
   };
 
-  try {
-    const response = await axios.post(
-      "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
-      body,
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+  const response = await axios
+    .post("https://gmail.googleapis.com/gmail/v1/users/me/drafts", body, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    })
+    .catch((err) => {
+      logger.error(
+        "Failed to create gmail draft:",
+        err.response?.data || err.message
+      );
+      throw new Error("Failed to create gmail draft");
+    });
 
-    return response.data;
-  } catch (err: any) {
-    console.log("Error creating draft:", err.response?.data || err.message);
-    return null;
-  }
+  return response.data;
 };
 
 export const createGmailReplyDraft = async (
@@ -726,155 +736,180 @@ export const createGmailReplyDraft = async (
     },
   };
 
-  try {
-    const response = await axios.post(
-      "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
-      body,
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+  const response = await axios
+    .post("https://gmail.googleapis.com/gmail/v1/users/me/drafts", body, {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        "Content-Type": "application/json",
+      },
+    })
+    .catch((err) => {
+      logger.error(
+        "Failed to create reply gmail draft:",
+        err.response?.data || err.message
+      );
+      throw new Error("Failed to create reply gmail draft");
+    });
 
-    return response.data;
-  } catch (err: any) {
-    console.log(
-      "Error creating reply draft:",
-      err.response?.data || err.message
-    );
-    return null;
-  }
+  return response.data;
 };
 
 export const getReplySenderEmailsUsingSearchQuery = async (
   searchQuery: string,
   access_token: string,
   timezone: string
-) => {
-  try {
-    const now = DateTime.now().setZone(timezone);
-    const twentyFourHoursAgo = now.minus({ days: 3 }).toUTC();
-    const nowUtc = now.toUTC();
-
-    const after = Math.floor(twentyFourHoursAgo.toSeconds());
-    const before = Math.floor(nowUtc.toSeconds());
-
-    const params = {
-      q: `"${searchQuery}" category:primary after:${after} before:${before}`,
-      maxResults: 100,
-    };
-
-    const listResponse = await axios.get(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: params,
-      }
-    );
-
-    const messages = listResponse.data.messages || [];
-
-    const replyEmailMetaData = await Promise.all(
-      messages.map(async (message: any) => {
-        const msgResponse = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" },
-          }
-        );
-
-        const { payload } = msgResponse.data;
-        const headers = payload.headers || [];
-
-        const subjectHeader = headers.find((h: any) => h.name === "Subject");
-        const fromHeader = headers.find((h: any) => h.name === "From");
-
-        const subject = subjectHeader ? subjectHeader.value : "No Subject";
-        const from = fromHeader ? fromHeader.value : "Unknown Sender";
-
-        return {
-          messageId: message.id,
-          threadId: message.threadId,
-          subject: subject,
-          from: from,
-        };
-      })
-    );
-
-    return replyEmailMetaData;
-  } catch (err: any) {
-    console.log(
-      "get emails using search query for reply draft Error:",
-      err.response?.data || err.message || err
-    );
-    return null;
+): Promise<Array<Email>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
   }
+
+  const now = DateTime.now().setZone(timezone);
+  const twentyFourHoursAgo = now.minus({ days: 3 }).toUTC();
+  const nowUtc = now.toUTC();
+
+  const after = Math.floor(twentyFourHoursAgo.toSeconds());
+  const before = Math.floor(nowUtc.toSeconds());
+
+  const params = {
+    q: `"${searchQuery}" category:primary after:${after} before:${before}`,
+    maxResults: 100,
+  };
+
+  const listResponse = await axios
+    .get("https://gmail.googleapis.com/gmail/v1/users/me/messages", {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: params,
+    })
+    .catch((err) => {
+      logger.error(
+        "get emails using search query for reply draft Error:",
+        err.response?.data || err.message
+      );
+      throw new Error(`could not get reply emails for your search query`);
+    });
+
+  const messages = listResponse.data.messages || [];
+  if (messages.length === 0) return [];
+
+  const emailResults = await Promise.allSettled(
+    messages.map(async (message: any) => {
+      const msgResponse = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { format: "full" },
+        }
+      );
+
+      const { payload } = msgResponse.data;
+      const headers = payload.headers || [];
+
+      const subjectHeader = headers.find((h: any) => h.name === "Subject");
+      const fromHeader = headers.find((h: any) => h.name === "From");
+
+      const subject = subjectHeader ? subjectHeader.value : "No Subject";
+      const from = fromHeader ? fromHeader.value : "Unknown Sender";
+
+      return {
+        messageId: message.id,
+        threadId: message.threadId,
+        subject: subject,
+        from: from,
+      };
+    })
+  );
+
+  const replyEmailMetaData: Array<Email> = [];
+
+  emailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      replyEmailMetaData.push(result.value);
+    } else {
+      logger.error(
+        `Failed to fetch reply Gmail email ${messages[index].id}:`,
+        result.reason
+      );
+    }
+  });
+
+  return replyEmailMetaData;
 };
 
 export const getSenderEmailsUsingSearchQuery = async (
   searchQuery: string,
   access_token: string,
   timezone: string
-) => {
-  try {
-    const now = DateTime.now().setZone(timezone);
-    const twentyFourHoursAgo = now.minus({ days: 7 }).toUTC();
-    const nowUtc = now.toUTC();
-
-    const after = Math.floor(twentyFourHoursAgo.toSeconds());
-    const before = Math.floor(nowUtc.toSeconds());
-
-    const params = {
-      q: `"${searchQuery}" category:primary after:${after} before:${before}`,
-    };
-
-    const listResponse = await axios.get(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-        params: params,
-      }
-    );
-
-    const messages = listResponse.data.messages || [];
-
-    const replyEmailMetaData = await Promise.all(
-      messages.map(async (message: any) => {
-        const msgResponse = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-            params: { format: "full" },
-          }
-        );
-
-        const { payload } = msgResponse.data;
-        const headers = payload.headers || [];
-
-        const subjectHeader = headers.find((h: any) => h.name === "Subject");
-        const fromHeader = headers.find((h: any) => h.name === "From");
-
-        const subject = subjectHeader ? subjectHeader.value : "No Subject";
-        const from = fromHeader ? fromHeader.value : "Unknown Sender";
-
-        return {
-          from: from,
-          id: message.id,
-        };
-      })
-    );
-
-    return replyEmailMetaData;
-  } catch (err: any) {
-    console.log(
-      "get emails using search query for reply draft Error:",
-      err.response?.data || err.message || err
-    );
-    return null;
+): Promise<Array<Email>> => {
+  if (!DateTime.now().setZone(timezone).isValid) {
+    throw new Error("Invalid timezone");
   }
+
+  const now = DateTime.now().setZone(timezone);
+  const twentyFourHoursAgo = now.minus({ days: 7 }).toUTC();
+  const nowUtc = now.toUTC();
+
+  const after = Math.floor(twentyFourHoursAgo.toSeconds());
+  const before = Math.floor(nowUtc.toSeconds());
+
+  const params = {
+    q: `"${searchQuery}" category:primary after:${after} before:${before}`,
+  };
+
+  const listResponse = await axios
+    .get("https://gmail.googleapis.com/gmail/v1/users/me/messages", {
+      headers: { Authorization: `Bearer ${access_token}` },
+      params: params,
+    })
+    .catch((err) => {
+      logger.error(
+        "sender emails using search query:",
+        err.response?.data || err.message
+      );
+      throw new Error("Failed to fetch sender emails using search query");
+    });
+
+  const messages = listResponse.data.messages || [];
+  if (messages.length === 0) return [];
+
+  const emailResults = await Promise.allSettled(
+    messages.map(async (message: { id: string }) => {
+      const msgResponse = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+          params: { format: "full" },
+        }
+      );
+
+      const { payload } = msgResponse.data;
+      const headers = payload.headers || [];
+
+      const subjectHeader = headers.find((h: any) => h.name === "Subject");
+      const fromHeader = headers.find((h: any) => h.name === "From");
+
+      const subject = subjectHeader ? subjectHeader.value : "No Subject";
+      const from = fromHeader ? fromHeader.value : "Unknown Sender";
+
+      return {
+        from: from,
+        id: message.id,
+      };
+    })
+  );
+
+  const sendersEmailMetadata: Array<Email> = [];
+  emailResults.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      sendersEmailMetadata.push(result.value);
+    } else {
+      logger.error(
+        `Failed to fetch sender email ${messages[index].id}:`,
+        result.reason
+      );
+    }
+  });
+
+  return sendersEmailMetadata;
 };
 
 export const updateGoogleCalendarEventFunc = async (
@@ -883,9 +918,9 @@ export const updateGoogleCalendarEventFunc = async (
   summary: string,
   description: string,
   location: string,
-  start: any,
-  end: any,
-  attendees: any
+  start: { dateTime: string; timeZone: string },
+  end: { dateTime: string; timeZone: string },
+  attendees: Array<{ email: string }>
 ) => {
   const calendarId = "primary";
   const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${previousEvent.id}`;
@@ -896,7 +931,8 @@ export const updateGoogleCalendarEventFunc = async (
     location: location ? location : previousEvent.location,
     start: start ? start : previousEvent.start,
     end: end ? end : previousEvent.end,
-    attendees: attendees ? attendees : previousEvent.attendees,
+    attendees:
+      attendees.length > 0 || attendees ? attendees : previousEvent.attendees,
     reminders: {
       useDefault: true,
     },
@@ -904,19 +940,21 @@ export const updateGoogleCalendarEventFunc = async (
 
   console.log(event);
 
-  try {
-    const response = await axios.put(apiUrl, event, {
+  const response = await axios
+    .put(apiUrl, event, {
       headers: {
         Authorization: `Bearer ${access_token}`,
         "Content-Type": "application/json",
       },
+    })
+    .catch((err) => {
+      logger.error(
+        `Error updating event:", ${err.response?.data || err.message}`
+      );
+      throw new Error("could not update event try again.");
     });
 
-    return response.data;
-  } catch (error: any) {
-    console.log("Error updating event:", error.response?.data || error.message);
-    return null;
-  }
+  return response.data;
 };
 
 export const deleteGoogleCalendarEventFunc = async (
@@ -926,34 +964,39 @@ export const deleteGoogleCalendarEventFunc = async (
   const calendarId = "primary";
   const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`;
 
-  try {
-    await axios.delete(apiUrl, {
+  await axios
+    .delete(apiUrl, {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
+    })
+    .catch((err) => {
+      logger.error(
+        `Error deleting event:", ${err.response?.data || err.message}`
+      );
+      throw new Error("could not delete event try again.");
     });
 
-    return { success: true };
-  } catch (error: any) {
-    console.log("Error deleting event:", error.response?.data || error.message);
-    return null;
-  }
+  return { success: true };
 };
 
-// Search calendar events by name
 export const searchGoogleCalendarEventsFunc = async (
   access_token: string,
   timezone: string
-) => {
-  try {
-    const now = DateTime.now().setZone(timezone);
-    const sevenDaysLater = now.plus({ days: 7 });
+): Promise<Array<CalenderEvent>> => {
+  const now = DateTime.now().setZone(timezone);
+  const sevenDaysLater = now.plus({ days: 7 });
 
-    // Convert both to UTC ISO format (required by Google Calendar API)
-    const timeMin = now.toUTC().toISO();
-    const timeMax = sevenDaysLater.toUTC().toISO();
+  // Convert both to UTC ISO format (required by Google Calendar API)
+  const timeMin = now.toUTC().toISO();
+  const timeMax = sevenDaysLater.toUTC().toISO();
 
-    const response = await axios.get(
+  if (!timeMin || !timeMax) {
+    throw new Error("something went wrong try again.");
+  }
+
+  const response = await axios
+    .get(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
         timeMin
       )}&timeMax=${encodeURIComponent(
@@ -965,9 +1008,16 @@ export const searchGoogleCalendarEventsFunc = async (
           Authorization: `Bearer ${access_token}`,
         },
       }
-    );
+    )
+    .catch((err) => {
+      logger.error(
+        `Error searching event:", ${err.response?.data || err.message}`
+      );
+      throw new Error("could not find event matching your search query.");
+    });
 
-    const eventsData: Array<any> = response.data.items.map((item: any) => ({
+  const eventsData: Array<CalenderEvent> = response.data.items.map(
+    (item: any) => ({
       id: item.id,
       title: item.summary || "No Title", // Event title
       description: item.description || "No Description", // Event description
@@ -986,14 +1036,8 @@ export const searchGoogleCalendarEventsFunc = async (
             responseStatus: attendee.responseStatus || "needsAction",
           }))
         : [],
-    }));
+    })
+  );
 
-    return eventsData;
-  } catch (error: any) {
-    console.error(
-      "Error searching events:",
-      error.response?.data || error.message
-    );
-    return null;
-  }
+  return eventsData;
 };

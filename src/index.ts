@@ -13,27 +13,34 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { getGoogleEmails, getGoogleCalenderEvents } from "./utils/gmailApi";
 import { getOutlookEmails, getOutlookCalenderEvents } from "./utils/outlookApi";
-import {
-  extractDatabaseContent,
-  getPageTitle,
-  retrieveBlockChildren,
-  formatPageContent,
-} from "./utils/notionFuncs";
-import { Client } from "@notionhq/client";
-import { summarizeNotionWithLLM } from "./utils/chatgptFuncs";
 import { refreshAccessTokensFunc } from "./utils/refreshAccessTokensFunc";
 import { twilio_client } from "./utils/twilioClient";
-import {
-  getConversations,
-  getUnreadMessagesFunc,
-  getLastReadTimestamp,
-} from "./utils/slackApi";
 import { logger } from "./utils/logger";
+
+import {
+  getSlackMessages,
+  getPerplexityNews,
+  getNotionSummaryForMorningUpdate,
+} from "./utils/helper_functions";
+
+import {
+  getSearchNewsQueryFromMorningPreferences,
+  getEventsFromMorningPreferences,
+  getrelevantEventsFromMorningPreferences,
+} from "./utils/chatgptFuncs";
+
+import {
+  Email,
+  CalenderEvent,
+  NotionSummary,
+  Slack,
+  PerplexityNews,
+} from "./utils/types";
 
 dotenv.config();
 
 const app: Application = express();
-const PORT: number = parseInt(process.env.PORT) || 5001;
+const PORT: number = parseInt(process.env.PORT || "5002");
 
 app.use(express.json());
 app.use(cookieParser());
@@ -146,148 +153,120 @@ const updateUserStateAndSendMorningBriefMessage = async (user: any) => {
 
 const prepareMorningBrief = async (user: any) => {
   try {
-    let google_emails: Array<any> = [];
-    let outlook_emails: Array<any> = [];
-
-    let google_calender_events: Array<any> = [];
-    let outlook_calender_events: Array<any> = [];
-
-    const all_unread_messages: Array<any> = [];
-
     user = await refreshAccessTokensFunc(user.token);
 
     if (!user) {
       return;
     }
 
-    if (user.google_login) {
-      google_emails = await getGoogleEmails(
-        user.google_access_token,
-        user.timeZone
-      );
+    const user_events: string = await getEventsFromMorningPreferences(
+      user.morning_update_preferences || ""
+    );
 
-      if (!google_emails) {
-        await updateUserStateAndSendMorningBriefMessage(user);
-        return;
-      }
-    }
+    const serach_query: string = await getSearchNewsQueryFromMorningPreferences(
+      user.morning_update_preferences || ""
+    );
 
-    if (user.outlook_login) {
-      outlook_emails = await getOutlookEmails(user.outlook_access_token);
+    const events = ``;
 
-      if (!outlook_emails) {
-        await updateUserStateAndSendMorningBriefMessage(user);
-        return;
-      }
-    }
+    const results = await Promise.allSettled([
+      user.google_login && user.google_access_token
+        ? getGoogleEmails(user.google_access_token, user.timeZone)
+        : Promise.resolve([]),
+      user.outlook_login && user.outlook_access_token
+        ? getOutlookEmails(user.outlook_access_token)
+        : Promise.resolve([]),
+      user.google_login && user.google_access_token
+        ? getGoogleCalenderEvents(user.google_access_token, user.timeZone)
+        : Promise.resolve([]),
+      user.outlook_login && user.outlook_access_token
+        ? getOutlookCalenderEvents(user.outlook_access_token)
+        : Promise.resolve([]),
+      user.slack_login && user.slack_user_access_token
+        ? getSlackMessages(user.slack_user_access_token, user.timeZone)
+        : Promise.resolve([]),
+      user.notion_login && user.notion_access_token
+        ? getNotionSummaryForMorningUpdate(user.notion_access_token)
+        : Promise.resolve([]),
+      user.morning_update_preferences
+        ? getPerplexityNews(serach_query)
+        : Promise.resolve([]),
+      getrelevantEventsFromMorningPreferences(user_events, events),
+    ]);
 
-    if (user.google_login) {
-      google_calender_events = await getGoogleCalenderEvents(
-        user.google_access_token,
-        user.timeZone
-      );
+    const response: {
+      success: boolean;
+      google_unread_emails: Array<Email>;
+      outlook_unread_emails: Array<Email>;
+      google_calender_events: Array<CalenderEvent>;
+      outlook_calender_events: Array<CalenderEvent>;
+      all_unread_messages: Array<Slack>;
+      notion_summary: NotionSummary;
+      perplexity_news: PerplexityNews;
+      event_data: string;
+      message?: string;
+      failedServices?: string[];
+    } = {
+      success: true,
+      google_unread_emails: [],
+      outlook_unread_emails: [],
+      google_calender_events: [],
+      outlook_calender_events: [],
+      all_unread_messages: [],
+      notion_summary: {
+        summary: "could not get summary for notion you can try again",
+      },
+      perplexity_news: { news: "No news" },
+      event_data: "No event data",
+      message: "your morning update is ready",
+    };
 
-      if (!google_calender_events) {
-        await updateUserStateAndSendMorningBriefMessage(user);
-        return;
-      }
-    }
+    const serviceMap = [
+      { name: "Google Unread Emails", key: "google_unread_emails" },
+      { name: "Outlook Unread Emails", key: "outlook_unread_emails" },
+      { name: "Google Calender events", key: "google_calender_events" },
+      { name: "Outlook Calender events", key: "outlook_calender_events" },
+      { name: "Notion summary", key: "notion_summary" },
+      { name: "Perplexity News", key: "perplexity_news" },
+      { name: "Event Data", key: "event_data" },
+    ];
 
-    if (user.outlook_login) {
-      outlook_calender_events = await getOutlookCalenderEvents(
-        user.outlook_access_token
-      );
-
-      if (!outlook_calender_events) {
-        await updateUserStateAndSendMorningBriefMessage(user);
-        return;
-      }
-    }
-
-    let notion_summary = null;
-
-    if (user.notion_login) {
-      const notion = new Client({ auth: user.notion_access_token });
-
-      const searchResponse = await notion.search({
-        filter: {
-          value: "page",
-          property: "object",
-        },
-      });
-
-      let allContent = "";
-
-      for (const item of searchResponse.results as any) {
-        if (item.object === "database") {
-          const databaseContent = await extractDatabaseContent(item.id, notion);
-          allContent += databaseContent + "\n\n";
-        } else if (item.object === "page") {
-          const pageTitle = getPageTitle(item);
-
-          const blocks = await retrieveBlockChildren(item.id, 0, notion);
-          const pageContent = formatPageContent(item, blocks);
-          allContent += pageContent + "\n\n---\n\n";
+    const failedServices: string[] = [];
+    results.forEach(
+      (
+        result: PromiseSettledResult<
+          | Array<Email>
+          | Array<CalenderEvent>
+          | Array<Slack>
+          | NotionSummary
+          | PerplexityNews
+          | string
+        >,
+        index: number
+      ) => {
+        const service = serviceMap[index];
+        if (result.status === "fulfilled") {
+          (response as any)[service.key] = result.value || [];
+        } else {
+          logger.error(`${service.name} fetch error: ${result.reason}`);
+          failedServices.push(service.name);
         }
       }
-
-      console.log("\nGenerating summary...");
-      notion_summary = await summarizeNotionWithLLM(allContent);
-      console.log("\nDone generating summary...");
-    }
-
-    if (user.slack_login) {
-      const conversations = await getConversations(
-        user.slack_user_access_token
-      );
-
-      if (conversations) {
-        for (const channel of conversations.channels) {
-          const isDM = channel.is_im;
-
-          const last_read_timestamp = await getLastReadTimestamp(
-            channel.id,
-            user.slack_user_access_token
-          );
-
-          if (last_read_timestamp) {
-            const unread_messages = await getUnreadMessagesFunc(
-              channel.id,
-              last_read_timestamp,
-              user.slack_user_access_token,
-              user.timeZone
-            );
-
-            if (!unread_messages) {
-              continue;
-            }
-
-            if (unread_messages.length > 0) {
-              all_unread_messages.push({
-                channel_name: channel.name,
-                type: isDM
-                  ? "direct_message"
-                  : channel.is_private
-                  ? "private_channel"
-                  : "public_channel",
-              });
-            }
-          }
-        }
-      }
-    }
+    );
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
         morning_update_check: false,
         morning_update: JSON.stringify({
-          notion_summary: notion_summary,
-          google_calender_events: google_calender_events,
-          outlook_calender_events: outlook_calender_events,
-          google_emails: google_emails,
-          outlook_emails: outlook_emails,
-          slack_unread_messages: all_unread_messages,
+          notion_summary: response.notion_summary,
+          google_calender_events: response.google_calender_events,
+          outlook_calender_events: response.outlook_calender_events,
+          google_emails: response.google_unread_emails,
+          outlook_emails: response.outlook_unread_emails,
+          slack_unread_messages: response.all_unread_messages,
+          perplexity_news: response.perplexity_news,
+          event_data: response.event_data,
         }),
       },
     });
@@ -305,16 +284,28 @@ const prepareMorningBrief = async (user: any) => {
   }
 };
 
+const setMorningBriefCheck = async (user: any) => {
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        morning_update_check: true,
+      },
+    });
+  } catch (err) {
+    console.log(err);
+  }
+};
+
 // Schedule cron jobs for all users on server start
 export const scheduleUserBriefs = async () => {
   try {
     const users = await prisma.user.findMany({});
-    console.log(`Scheduling briefs for ${users.length} users`);
+    console.log(`Scheduling morning briefs for ${users.length} users`);
 
     users.forEach((user: any) => {
       if (user.morning_brief_time) {
         const cronExpression = getPrepCronExpression(user.morning_brief_time);
-        console.log(`Scheduling brief for ${user.name} at ${cronExpression}`);
 
         // Schedule the cron job
         cron.schedule(
@@ -329,7 +320,33 @@ export const scheduleUserBriefs = async () => {
       }
     });
   } catch (error) {
-    console.error("Error scheduling briefs:", error);
+    logger.error("Error scheduling briefs:", error);
+  }
+};
+
+export const scheduleUserMorningUpdateCheck = async () => {
+  try {
+    const users = await prisma.user.findMany({});
+    console.log(`Scheduling morning brief checkers for ${users.length} users`);
+
+    users.forEach((user: any) => {
+      if (user.morning_brief_time) {
+        const cronExpression = "0 12 * * *"; // 12 PM every day
+
+        // Schedule the cron job
+        cron.schedule(
+          cronExpression,
+          () => {
+            setMorningBriefCheck(user);
+          },
+          {
+            timezone: user.timeZone || "UTC",
+          }
+        );
+      }
+    });
+  } catch (err) {
+    logger.error("Error scheduling brief checks:", err);
   }
 };
 
@@ -339,6 +356,7 @@ const start = async (): Promise<void> => {
       logger.info(`Listening on port ${PORT}`);
     });
     await scheduleUserBriefs();
+    await scheduleUserMorningUpdateCheck();
   } catch (err) {
     logger.error(err);
   }

@@ -11,8 +11,18 @@ import {
   notFoundResponse,
   unauthorizedErrorResponse,
 } from "./errors";
+import { logger } from "../utils/logger";
 
 dotenv.config();
+
+const fail = (message: string): void => {
+  logger.error(message);
+  throw new Error(message);
+};
+
+const isNonEmptyString = (value: any): boolean => {
+  return typeof value === "string" && value.trim().length > 0;
+};
 
 const integrateOutlookAccount = async (
   code: string,
@@ -31,10 +41,10 @@ const integrateOutlookAccount = async (
     const tokenResponse = await axios.post(
       "https://login.microsoftonline.com/common/oauth2/v2.0/token",
       new URLSearchParams({
-        client_id: process.env.OUTLOOK_CLIENT_ID,
-        client_secret: process.env.OUTLOOK_CLIENT_SECRET,
+        client_id: process.env.OUTLOOK_CLIENT_ID || "",
+        client_secret: process.env.OUTLOOK_CLIENT_SECRET || "",
         code,
-        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI || "",
         grant_type: "authorization_code",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
@@ -63,7 +73,7 @@ const integrateOutlookAccount = async (
       success: true,
       message: "Outlook account integrated successfully",
     });
-  } catch (err) {
+  } catch (err: any) {
     console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
@@ -89,9 +99,9 @@ const integrateGmailAccount = async (
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
         grant_type: "authorization_code",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
@@ -124,7 +134,7 @@ const integrateGmailAccount = async (
       success: true,
       message: "Google account integrated successfully",
     });
-  } catch (err) {
+  } catch (err: any) {
     console.log(err.response.data);
     if (!res.headersSent) {
       return internalServerError(res);
@@ -141,20 +151,22 @@ export const googleAuth: RequestHandler = async (
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth?` +
       new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
         response_type: "code",
-        scope: process.env.GOOGLE_SCOPES,
+        scope: process.env.GOOGLE_SCOPES || "",
         access_type: "offline",
-        prompt: "consent", // Forces consent screen for testing
-      });
+        prompt: "consent",
+      }).toString(); // toString is optional here, but adds clarity
 
     return res.status(200).json({ success: true, message: authUrl });
   } catch (err) {
-    console.log(err);
+    logger.error(`Error in googleAuth: ${err}`);
     if (!res.headersSent) {
       return internalServerError(res);
     }
+  } finally {
+    await prisma.$disconnect();
   }
 };
 
@@ -166,7 +178,7 @@ export const googleredirectauth: RequestHandler = async (
   try {
     const { code }: { code: string } = req.body;
 
-    if (!code.trim()) {
+    if (!isNonEmptyString(code)) {
       return badRequestResponse(res, "Try again something went wrong!");
     }
 
@@ -180,11 +192,11 @@ export const googleredirectauth: RequestHandler = async (
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
         grant_type: "authorization_code",
-      }),
+      }).toString(),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
 
@@ -258,10 +270,12 @@ export const googleredirectauth: RequestHandler = async (
       .status(201)
       .json({ success: true, message: "Logged in successfully" });
   } catch (err) {
-    console.log(err);
+    logger.error(`Error in googleredirectauth: ${err}`);
     if (!res.headersSent) {
       return internalServerError(res);
     }
+  } finally {
+    await prisma.$disconnect();
   }
 };
 
@@ -274,10 +288,10 @@ export const outlookAuth: RequestHandler = async (
     const authUrl =
       `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
       new URLSearchParams({
-        client_id: process.env.OUTLOOK_CLIENT_ID,
-        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        client_id: process.env.OUTLOOK_CLIENT_ID || "",
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI || "",
         response_type: "code",
-        scope: process.env.OUTLOOK_SCOPES,
+        scope: process.env.OUTLOOK_SCOPES || "",
         access_type: "offline",
         prompt: "consent",
       });
@@ -288,6 +302,8 @@ export const outlookAuth: RequestHandler = async (
     if (!res.headersSent) {
       return internalServerError(res);
     }
+  } finally {
+    await prisma.$disconnect();
   }
 };
 
@@ -312,10 +328,10 @@ export const outlookredirectauth: RequestHandler = async (
     const tokenResponse = await axios.post(
       "https://login.microsoftonline.com/common/oauth2/v2.0/token",
       new URLSearchParams({
-        client_id: process.env.OUTLOOK_CLIENT_ID,
-        client_secret: process.env.OUTLOOK_CLIENT_SECRET,
+        client_id: process.env.OUTLOOK_CLIENT_ID || "",
+        client_secret: process.env.OUTLOOK_CLIENT_SECRET || "",
         code,
-        redirect_uri: process.env.OUTLOOK_REDIRECT_URI,
+        redirect_uri: process.env.OUTLOOK_REDIRECT_URI || "",
         grant_type: "authorization_code",
       }),
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
@@ -509,8 +525,8 @@ export const notionAuth: RequestHandler = async (
     const authUrl =
       `https://api.notion.com/v1/oauth/authorize?` +
       new URLSearchParams({
-        client_id: process.env.NOTION_CLIENT_ID,
-        redirect_uri: process.env.NOTION_REDIRECT_URI,
+        client_id: process.env.NOTION_CLIENT_ID || "",
+        redirect_uri: process.env.NOTION_REDIRECT_URI || "",
         response_type: "code",
         owner: "user",
       });
@@ -550,7 +566,7 @@ export const integrateNotionAccount: RequestHandler = async (
       "https://api.notion.com/v1/oauth/token",
       new URLSearchParams({
         code,
-        redirect_uri: process.env.NOTION_REDIRECT_URI,
+        redirect_uri: process.env.NOTION_REDIRECT_URI || "",
         grant_type: "authorization_code",
       }),
       {
@@ -597,11 +613,11 @@ export const slackAuth: RequestHandler = async (
     const authUrl =
       `https://slack.com/oauth/v2/authorize?` +
       new URLSearchParams({
-        client_id: process.env.SLACK_CLIENT_ID,
-        redirect_uri: process.env.SLACK_REDIRECT_URI,
+        client_id: process.env.SLACK_CLIENT_ID || "",
+        redirect_uri: process.env.SLACK_REDIRECT_URI || "",
         response_type: "code",
-        scope: process.env.SLACK_SCOPES, // Bot token scopes
-        user_scope: process.env.SLACK_USER_SCOPES, // User token scopes
+        scope: process.env.SLACK_SCOPES || "", // Bot token scopes
+        user_scope: process.env.SLACK_USER_SCOPES || "", // User token scopes
       });
 
     return res.status(200).json({ success: true, message: authUrl });
@@ -643,6 +659,12 @@ export const integrateslackAccount: RequestHandler = async (
     const { username }: { username: string } = jwt_decode(token);
 
     const user = await prisma.user.findFirst({ where: { username: username } });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
 
     console.log(response.data);
     console.log(response.data.message);

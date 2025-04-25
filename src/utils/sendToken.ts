@@ -8,7 +8,7 @@ const getSignedToken: Function = async (
 ): Promise<{ token: string }> => {
   const token = jwt.sign(
     { username: username },
-    process.env.JWT_SECRET_REFRESH,
+    process.env.JWT_SECRET_REFRESH || "",
     { expiresIn: "10d" }
   );
 

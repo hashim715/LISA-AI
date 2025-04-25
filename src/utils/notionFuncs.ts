@@ -1,12 +1,14 @@
-import { iteratePaginatedAPI, Client } from "@notionhq/client";
+import { iteratePaginatedAPI, Client, isFullPage } from "@notionhq/client";
 import {
   BlockObjectResponse,
   PageObjectResponse,
   PartialDatabaseObjectResponse,
   PartialPageObjectResponse,
+  DatabaseObjectResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 import { openai } from "./chatgptFuncs";
 import { summarizeNotionWithLLM } from "./chatgptFuncs";
+import { logger } from "./logger";
 
 export const getPlainTextFromRichText = (richText: any) => {
   return richText.map((t: any) => t.plain_text).join("");
@@ -397,7 +399,7 @@ export const selectTaskListPage = async (
       model: "gpt-3.5-turbo",
     });
 
-    const selectedTitle = completion.choices[0].message.content.trim();
+    const selectedTitle = completion.choices[0].message.content?.trim();
     const selectedIndex = pageTitles.indexOf(selectedTitle);
 
     if (selectedIndex === -1) {
@@ -475,7 +477,7 @@ export const selectPageBasedOnQuestion = async (
       model: "gpt-3.5-turbo",
     });
 
-    const selectedTitle = completion.choices[0].message.content.trim();
+    const selectedTitle = completion.choices[0].message.content?.trim();
     console.log("Selected title from LLM:", selectedTitle);
 
     if (selectedTitle === "NO_MATCH") {
@@ -484,7 +486,7 @@ export const selectPageBasedOnQuestion = async (
 
     const selectedIndex = pageTitles.findIndex(
       (title: string) =>
-        title.trim().toLowerCase() === selectedTitle.toLowerCase()
+        title.trim().toLowerCase() === selectedTitle?.toLowerCase()
     );
 
     if (selectedIndex === -1) {
@@ -494,7 +496,7 @@ export const selectPageBasedOnQuestion = async (
     }
 
     return { page: pages[selectedIndex] };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in selectPageBasedOnQuestion:", error);
     return { error: `Error selecting page: ${error.message}` };
   }
@@ -502,38 +504,931 @@ export const selectPageBasedOnQuestion = async (
 
 // New function to handle the search process
 export const searchNotion = async (question: string, notion: Client) => {
+  // Get all pages
+  const pages = await getAllPages(notion);
+
+  if (pages.length === 0) {
+    logger.error("No pages found in the workspace.");
+    throw new Error("No pages found in the workspace.");
+  }
+
+  // Select the most relevant page based on the question
+  const selectionResult = await selectPageBasedOnQuestion(pages, question);
+
+  if (selectionResult.error) {
+    logger.error("could not find page matching query");
+    throw new Error("could not find page matching query");
+  }
+
+  const selectedPage = selectionResult.page;
+  const pageTitle = getPageTitle(selectedPage);
+
+  if (!selectedPage) {
+    logger.error("could not find page");
+    throw new Error("could not find page");
+  }
+
+  // Process the selected page
+  const blocks = await retrieveBlockChildren(selectedPage.id, 0, notion);
+  const pageContent = formatPageContent(selectedPage, blocks);
+
+  // Generate summary
+  const summary = await summarizeNotionWithLLM(pageContent);
+
+  return {
+    pageTitle,
+    pageUrl: selectedPage.url,
+    summary,
+    matchedTitle: selectionResult.matchedTitle,
+  };
+};
+
+export const getAllDatabases = async (notion: Client) => {
+  const databases = [];
   try {
-    // Get all pages
-    const pages = await getAllPages(notion);
+    for await (const database of iteratePaginatedAPI(notion.search, {
+      filter: {
+        property: "object",
+        value: "database",
+      },
+    })) {
+      databases.push(database);
+    }
+    return databases;
+  } catch (error) {
+    logger.error("Error searching for databases:", error);
+    return [];
+  }
+};
 
-    if (pages.length === 0) {
-      return { error: "No pages found in the workspace." };
+export const getDatabaseTitle = (database: any) => {
+  if (database.title && database.title.length > 0) {
+    return database.title[0].plain_text;
+  } else if (database.properties?.Name?.title) {
+    return database.properties.Name.title[0].plain_text;
+  } else {
+    return "Untitled Database";
+  }
+};
+
+export const selectPageBasedOnInput = async (
+  pages: Array<PageObjectResponse>,
+  userInput: string
+) => {
+  try {
+    const pageTitles = pages.map((page) => getPageTitle(page));
+
+    console.log("Available page titles:", pageTitles);
+    console.log("User input:", userInput);
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that analyzes page titles to identify which page a user is referring to. Return only the exact title of the most relevant page, or if no page seems relevant, return 'NO_MATCH'. Be lenient in matching - if a user's input contains words that match a page title, consider it a match.",
+        },
+        {
+          role: "user",
+          content: `Here are the page titles from a Notion workspace:\n\n${pageTitles.join(
+            "\n"
+          )}\n\nUser's input: ${userInput}\n\nPlease identify which page the user is referring to. Return only the exact title of the most relevant page, or 'NO_MATCH' if no page seems relevant.`,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+    });
+
+    const selectedTitle = completion.choices[0].message.content?.trim();
+    console.log("LLM selected title:", selectedTitle);
+
+    if (selectedTitle === "NO_MATCH" || !selectedTitle) {
+      return null;
     }
 
-    // Select the most relevant page based on the question
-    const selectionResult = await selectPageBasedOnQuestion(pages, question);
+    const selectedPage = pages.find(
+      (page) => getPageTitle(page).toLowerCase() === selectedTitle.toLowerCase()
+    );
 
-    if (selectionResult.error) {
-      return selectionResult;
+    if (!selectedPage) {
+      console.log("No exact match found for:", selectedTitle);
+      // Try partial match as fallback
+      const partialMatch = pages.find(
+        (page) =>
+          getPageTitle(page)
+            .toLowerCase()
+            .includes(selectedTitle.toLowerCase()) ||
+          selectedTitle.toLowerCase().includes(getPageTitle(page).toLowerCase())
+      );
+      if (partialMatch) {
+        console.log("Found partial match:", getPageTitle(partialMatch));
+        return partialMatch;
+      }
     }
 
-    const selectedPage = selectionResult.page;
-    const pageTitle = getPageTitle(selectedPage);
+    return selectedPage;
+  } catch (error) {
+    console.error("Error selecting page:", error);
+    return null;
+  }
+};
 
-    // Process the selected page
-    const blocks = await retrieveBlockChildren(selectedPage.id, 0, notion);
-    const pageContent = formatPageContent(selectedPage, blocks);
+export const updatePageTitle = async (
+  pageId: string,
+  newTitle: string,
+  notion: Client
+) => {
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        title: {
+          title: [
+            {
+              text: {
+                content: newTitle,
+              },
+            },
+          ],
+        },
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("Error updating page title:", error);
+    return false;
+  }
+};
 
-    // Generate summary
-    const summary = await summarizeNotionWithLLM(pageContent);
+export const getDatabaseItems = async (databaseId: string, notion: Client) => {
+  try {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+    });
+    return response.results;
+  } catch (error) {
+    console.error("Error fetching database items:", error);
+    return [];
+  }
+};
+
+export const getItemTitle = (item: any) => {
+  // Try different possible title property formats
+  if (item.properties?.Name?.title?.[0]?.plain_text) {
+    return item.properties.Name.title[0].plain_text;
+  } else if (item.properties?.title?.title?.[0]?.plain_text) {
+    return item.properties.title.title[0].plain_text;
+  } else if (item.properties?.Task?.title?.[0]?.plain_text) {
+    return item.properties.Task.title[0].plain_text;
+  } else if (item.properties?.Item?.title?.[0]?.plain_text) {
+    return item.properties.Item.title[0].plain_text;
+  } else {
+    // If no title found, try to find any property that might contain the title
+    for (const [key, value] of Object.entries(item.properties) as [
+      string,
+      any
+    ][]) {
+      if (value.type === "title" && value.title?.[0]?.plain_text) {
+        return value.title[0].plain_text;
+      }
+    }
+    return "Untitled Item";
+  }
+};
+
+export const parseUserInput = async (
+  input: string,
+  databases: Array<any>,
+  items: Array<any>
+) => {
+  try {
+    const databaseTitles = databases.map((db) => getDatabaseTitle(db));
+    const itemTitles = items.map((item) => getItemTitle(item));
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant that parses user input to identify:
+            1. Which database they're referring to
+            2. Which item in that database they want to update
+            3. What status they want to set (Not started, In progress, or Done)
+
+            Available databases: ${databaseTitles.join(", ")}
+            Available items: ${itemTitles.join(", ")}
+
+            Return a JSON object with these fields:
+            {
+              "database": "exact database title",
+              "item": "exact item title",
+              "status": "Not started/In progress/Done"
+            }
+
+            If you can't identify any of these, use null for that field.`,
+        },
+        {
+          role: "user",
+          content: input,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+      response_format: { type: "json_object" },
+    });
+
+    return JSON.parse(completion.choices[0].message.content || "");
+  } catch (error) {
+    console.error("Error parsing user input:", error);
+    return null;
+  }
+};
+
+export const updateItemStatus = async (
+  pageId: string,
+  newStatus: string,
+  notion: Client
+) => {
+  try {
+    const page = await notion.pages.retrieve({ page_id: pageId });
+
+    if (!isFullPage(page)) {
+      throw new Error("Retrieved page is not a full page object.");
+    }
+
+    const statusProperty = page.properties.Status;
+    let updateProperties = {};
+
+    if (statusProperty.type === "status") {
+      updateProperties = {
+        Status: {
+          status: {
+            name: newStatus,
+          },
+        },
+      };
+    } else if (statusProperty.type === "checkbox") {
+      const isChecked = newStatus.toLowerCase() === "done";
+      updateProperties = {
+        Status: {
+          checkbox: isChecked,
+        },
+      };
+    } else {
+      throw new Error(
+        `Unsupported Status property type: ${statusProperty.type}`
+      );
+    }
+
+    await notion.pages.update({
+      page_id: pageId,
+      properties: updateProperties,
+    });
+
+    return true;
+  } catch (error) {
+    logger.error("Error updating item status:", error);
+    return false;
+  }
+};
+
+export const findPage = async (query: string, notion: Client) => {
+  try {
+    const response = await notion.search({
+      query,
+      filter: {
+        property: "object",
+        value: "page",
+      },
+      sort: {
+        direction: "descending",
+        timestamp: "last_edited_time",
+      },
+    });
+
+    return response.results.length > 0 ? response.results[0] : null;
+  } catch (error: any) {
+    logger.error("❌ Error during search:", error.message);
+    return null;
+  }
+};
+
+export const archivePage = async (pageId: string, notion: Client) => {
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      archived: true,
+    });
+    logger.info("✅ Successfully archived the page.");
+  } catch (error: any) {
+    if (
+      error.code === "validation_error" &&
+      error.message.includes("workspace level pages")
+    ) {
+      logger.error("❌ Cannot archive workspace-level pages via the API.");
+    } else if (error.code === "object_not_found") {
+      logger.error("❌ The page ID does not exist or access is denied.");
+    } else {
+      logger.error("❌ Error archiving page:", error.message);
+    }
+  }
+};
+
+export const parseUserInputForChangeDueDate = async (
+  input: string,
+  databases: Array<any>,
+  items: Array<any>
+) => {
+  try {
+    const databaseTitles = databases.map((db) => getDatabaseTitle(db));
+    const itemTitles = items.map((item) => getItemTitle(item));
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant that parses user input to identify:
+            1. Which database they're referring to
+            2. Which item in that database they want to update
+            3. What due date they want to set (in YYYY-MM-DD format)
+
+            Available databases: ${databaseTitles.join(", ")}
+            Available items: ${itemTitles.join(", ")}
+
+            Return a JSON object with these fields:
+            {
+              "database": "exact database title",
+              "item": "exact item title",
+              "dueDate": "YYYY-MM-DD"
+            }
+
+            If you can't identify any of these, use null for that field.`,
+        },
+        {
+          role: "user",
+          content: input,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+      response_format: { type: "json_object" },
+    });
+
+    return JSON.parse(completion.choices[0].message.content || "");
+  } catch (error) {
+    console.error("Error parsing user input:", error);
+    return null;
+  }
+};
+
+export const findMostSimilarDatabase = async (
+  databases: Array<any>,
+  targetName: string
+) => {
+  try {
+    const databaseTitles = databases.map((db) => getDatabaseTitle(db));
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant that finds the most similar database name from a list.
+            Given a target database name and a list of available databases, return the exact name from the list that is most similar to the target.
+
+            Available databases: ${databaseTitles.join(", ")}
+
+            Return a JSON object with this field:
+            {
+              "database": "exact database name from the list"
+            }
+
+            If no database seems similar, return null.`,
+        },
+        {
+          role: "user",
+          content: `Find the database most similar to: "${targetName}"`,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(completion.choices[0].message.content || "");
+    return result.database;
+  } catch (error) {
+    console.error("Error finding similar database:", error);
+    return null;
+  }
+};
+
+export const updateItemDueDate = async (
+  pageId: string,
+  newDueDate: string,
+  notion: Client
+) => {
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        "Due Date": {
+          rich_text: [
+            {
+              type: "text",
+              text: {
+                content: newDueDate,
+              },
+            },
+          ],
+        },
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("Error updating item due date:", error);
+    return false;
+  }
+};
+
+// Function to find the most similar database using OpenAI
+export const indMostSimilarDatabaseForAddingDatabaseEntry = async (
+  databases: Array<any>,
+  query: string
+) => {
+  try {
+    // Create a list of database titles
+    const databaseTitles = databases.map((db) => getDatabaseTitle(db));
+
+    // Create the prompt for OpenAI
+    const prompt = `Given the following list of database names and a user query, identify which database the user is most likely referring to.
+    
+      Database names:
+      ${databaseTitles
+        .map((title, index) => `${index + 1}. ${title}`)
+        .join("\n")}
+
+      User query: "${query}"
+
+      Return ONLY the number of the most relevant database (1-${
+        databaseTitles.length
+      }). If no database seems relevant, return 0.`;
+
+    // Call OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that matches user queries to database names. Return only the number of the most relevant database.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 10,
+    });
+
+    const selectedIndex = parseInt(
+      response.choices[0].message.content?.trim() || "0"
+    );
+
+    if (
+      selectedIndex === 0 ||
+      isNaN(selectedIndex) ||
+      selectedIndex > databaseTitles.length
+    ) {
+      return { database: null, confidence: 0 };
+    }
 
     return {
-      pageTitle,
-      pageUrl: selectedPage.url,
-      summary,
-      matchedTitle: selectionResult.matchedTitle,
+      database: databases[selectedIndex - 1],
+      confidence: 1, // Since we're using GPT, we can be more confident in the match
     };
   } catch (error) {
-    return { error: `Error processing content: ${error.message}` };
+    console.error("Error finding database:", error);
+    return { database: null, confidence: 0 };
+  }
+};
+
+// Function to match field names using OpenAI
+export const matchFieldName = async (input: string, fields: Array<any>) => {
+  try {
+    const prompt = `Given the following list of available fields and a user's input, identify which field the user is most likely referring to.
+    
+        Available fields:
+        ${fields
+          .map((field, index) => `${index + 1}. ${field.name} (${field.type})`)
+          .join("\n")}
+
+        User input: "${input}"
+
+        Return ONLY the number of the most relevant field (1-${
+          fields.length
+        }). If no field seems relevant, return 0.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that matches user field inputs to available database fields. Return only the number of the most relevant field.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 10,
+    });
+
+    const selectedIndex = parseInt(
+      response.choices[0].message.content?.trim() || "0"
+    );
+
+    if (
+      selectedIndex === 0 ||
+      isNaN(selectedIndex) ||
+      selectedIndex > fields.length
+    ) {
+      return null;
+    }
+
+    return fields[selectedIndex - 1];
+  } catch (error) {
+    console.error("Error matching field name:", error);
+    return null;
+  }
+};
+
+// Function to match status input to available options using OpenAI
+export const matchStatusOption = async (
+  input: string,
+  availableOptions: Array<any>
+) => {
+  if (availableOptions.length === 0) return null;
+
+  try {
+    const prompt = `Given the following list of available status options and a user's input, identify which status option the user is most likely referring to.
+    
+      Available status options:
+      ${availableOptions.map((opt, index) => `${index + 1}. ${opt}`).join("\n")}
+
+      User input: "${input}"
+
+      Return ONLY the number of the most relevant status option (1-${
+        availableOptions.length
+      }). If no option seems relevant, return 0.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that matches user status inputs to available status options. Return only the number of the most relevant option.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 10,
+    });
+
+    const selectedIndex = parseInt(
+      response.choices[0].message.content?.trim() || "0"
+    );
+
+    if (
+      selectedIndex === 0 ||
+      isNaN(selectedIndex) ||
+      selectedIndex > availableOptions.length
+    ) {
+      return null;
+    }
+
+    return availableOptions[selectedIndex - 1];
+  } catch (error) {
+    console.error("Error matching status option:", error);
+    return null;
+  }
+};
+
+export const getFieldInfo = (properties: Record<string, any>) => {
+  return Object.entries(properties).map(([key, prop]) => ({
+    key,
+    name: prop.name,
+    type: prop.type,
+  }));
+};
+
+// Function to parse natural language input
+export const parseEntryInput = async (
+  input: string,
+  properties: Record<string, any>
+) => {
+  const entry: Record<string, any> = {};
+  const fields = getFieldInfo(properties);
+
+  // Split input into field-value pairs
+  const pairs = input.split(",").map((pair) => pair.trim());
+
+  for (const pair of pairs) {
+    let fieldInput, valueInput;
+
+    // Try both formats: "set X to Y" and "X: Y"
+    if (pair.toLowerCase().startsWith("set ")) {
+      const parts = pair
+        .slice(4)
+        .split(" to ")
+        .map((part) => part.trim());
+      if (parts.length !== 2) continue;
+      [fieldInput, valueInput] = parts;
+    } else {
+      const parts = pair.split(":").map((part) => part.trim());
+      if (parts.length !== 2) continue;
+      [fieldInput, valueInput] = parts;
+    }
+
+    // Match field name
+    const matchedField: any = await matchFieldName(fieldInput, fields);
+    if (!matchedField) {
+      console.log(`❌ Could not match field: "${fieldInput}"`);
+      console.log("Available fields:");
+      fields.forEach((field) => console.log(`- ${field.name} (${field.type})`));
+      return null;
+    }
+
+    // Handle value based on field type
+    switch (matchedField.type) {
+      case "title":
+        entry[matchedField.key] = {
+          title: [{ text: { content: valueInput } }],
+        };
+        break;
+      case "rich_text":
+        entry[matchedField.key] = {
+          rich_text: [{ text: { content: valueInput } }],
+        };
+        break;
+      case "number":
+        // Extract numeric value from input
+        const numericValue = parseFloat(valueInput.replace(/[^0-9.]/g, ""));
+        if (isNaN(numericValue)) {
+          console.log(
+            `❌ Invalid number format for field "${matchedField.name}": "${valueInput}"`
+          );
+          return null;
+        }
+        entry[matchedField.key] = {
+          number: numericValue,
+        };
+        break;
+      case "select":
+        entry[matchedField.key] = {
+          select: { name: valueInput },
+        };
+        break;
+      case "multi_select":
+        entry[matchedField.key] = {
+          multi_select: valueInput
+            .split(",")
+            .map((name) => ({ name: name.trim() })),
+        };
+        break;
+      case "date":
+        // Try to parse the date in various formats
+        const dateFormats = [
+          "MM/DD/YYYY",
+          "YYYY-MM-DD",
+          "DD/MM/YYYY",
+          "MM-DD-YYYY",
+          "YYYY/MM/DD",
+        ];
+        let parsedDate = null;
+        for (const format of dateFormats) {
+          try {
+            parsedDate = new Date(valueInput);
+            if (!isNaN(parsedDate.getTime())) break;
+          } catch (e) {
+            continue;
+          }
+        }
+        if (!parsedDate || isNaN(parsedDate.getTime())) {
+          console.log(
+            `❌ Invalid date format for field "${matchedField.name}": "${valueInput}"`
+          );
+          return null;
+        }
+        entry[matchedField.key] = {
+          date: { start: parsedDate.toISOString().split("T")[0] },
+        };
+        break;
+      case "checkbox":
+        // Convert various "true" and "false" inputs to boolean
+        const trueValues = [
+          "true",
+          "yes",
+          "done",
+          "completed",
+          "finished",
+          "not started",
+          "in progress",
+        ];
+        const falseValues = ["false", "no", "not done", "pending", "todo"];
+        const lowerValue = valueInput.toLowerCase();
+        if (trueValues.includes(lowerValue)) {
+          entry[matchedField.key] = { checkbox: true };
+        } else if (falseValues.includes(lowerValue)) {
+          entry[matchedField.key] = { checkbox: false };
+        } else {
+          console.log(
+            `❌ Invalid checkbox value for field "${matchedField.name}": "${valueInput}"`
+          );
+          return null;
+        }
+        break;
+      case "status":
+        const statusOptions = properties[matchedField.key].status.options.map(
+          (opt: any) => opt.name
+        );
+        const matchedStatus = await matchStatusOption(
+          valueInput,
+          statusOptions
+        );
+        if (!matchedStatus) {
+          console.log(
+            `❌ Invalid status option. Available options are: ${statusOptions.join(
+              ", "
+            )}`
+          );
+          return null;
+        }
+        entry[matchedField.key] = {
+          status: { name: matchedStatus },
+        };
+        break;
+      default:
+        entry[matchedField.key] = {
+          [matchedField.type]: valueInput,
+        };
+    }
+  }
+
+  // Verify all required fields are present
+  const requiredFields = fields.filter((field) => field.type === "title");
+  for (const field of requiredFields) {
+    if (!entry[field.key]) {
+      console.log(`❌ Missing required field: "${field.name}"`);
+      return null;
+    }
+  }
+
+  return entry;
+};
+
+export const addDatabaseEntryFunc = async (
+  databaseId: string,
+  entry: any,
+  notion: Client
+) => {
+  try {
+    const response = await notion.pages.create({
+      parent: { database_id: databaseId },
+      properties: entry,
+    });
+    console.log("✅ Successfully added entry to database");
+    return response;
+  } catch (error: any) {
+    console.error("❌ Error adding entry:", error.message);
+    return null;
+  }
+};
+
+export const findBestMatchingDatabase = async (
+  databaseName: string,
+  databases: Array<any>
+) => {
+  const databaseList = databases.map((db) => getDatabaseTitle(db)).join(", ");
+
+  const prompt = `Given the following list of database names: ${databaseList}
+  
+    User is looking for: "${databaseName}"
+
+    Please return the exact name of the database that best matches what the user is looking for. 
+    Only return the exact name, nothing else.
+  `;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 50,
+    });
+
+    const matchedName = response.choices[0].message.content?.trim();
+    console.log(`GPT matched name: "${matchedName}"`);
+
+    // Try exact match first
+    let selectedDatabase = databases.find(
+      (db) => getDatabaseTitle(db) === matchedName
+    );
+
+    // If no exact match, try case-insensitive match
+    if (!selectedDatabase) {
+      selectedDatabase = databases.find(
+        (db) =>
+          getDatabaseTitle(db).toLowerCase() === matchedName?.toLowerCase()
+      );
+    }
+
+    // If still no match, try partial match
+    if (!selectedDatabase) {
+      selectedDatabase = databases.find(
+        (db) =>
+          getDatabaseTitle(db)
+            .toLowerCase()
+            .includes(matchedName?.toLowerCase()) ||
+          matchedName
+            ?.toLowerCase()
+            .includes(getDatabaseTitle(db).toLowerCase())
+      );
+    }
+
+    if (!selectedDatabase) {
+      console.log(
+        "Available database titles:",
+        databases.map((db) => getDatabaseTitle(db))
+      );
+    }
+
+    return selectedDatabase;
+  } catch (error) {
+    console.error("Error finding matching database:", error);
+    return null;
+  }
+};
+
+export const generateSummary = async (
+  databaseTitle: string,
+  schema: any,
+  sampleItems: any
+) => {
+  const prompt = `Please provide a summary of the Notion database "${databaseTitle}".
+
+      Database Schema:
+      ${JSON.stringify(schema, null, 2)}
+
+      Sample Items (up to 5):
+      ${JSON.stringify(sampleItems, null, 2)}
+
+      Please provide a concise summary that includes:
+      1. The purpose of this database
+      2. The main fields and their types
+      3. A brief description of the sample items
+      4. Any notable patterns or observations
+
+      Keep the response under 300 words.
+    `;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 500,
+  });
+
+  return response.choices[0].message.content || "";
+};
+
+type Database = {
+  properties: {
+    [key: string]: { type: string };
+  };
+};
+
+export const getDatabaseSchema = (database: Database) => {
+  const schema: { [key: string]: string } = {};
+  for (const [key, value] of Object.entries(database.properties)) {
+    schema[key] = value.type;
+  }
+  return schema;
+};
+
+// Function to get sample items from database
+export const getSampleItems = async (
+  databaseId: string,
+  limit = 5,
+  notion: Client
+) => {
+  try {
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      page_size: limit,
+    });
+    return response.results;
+  } catch (error) {
+    console.error("Error getting sample items:", error);
+    return [];
   }
 };

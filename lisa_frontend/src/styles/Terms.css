@@ -1,0 +1,113 @@
+.about-container {
+  min-height: 100vh;
+  background-color: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1rem;
+  position: relative;
+}
+
+.company-name {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #b8b8b8;
+}
+
+.the-login-button {
+  cursor: pointer;
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  width: 170px;
+  height: 44px;
+  padding: 0px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e5e5e5;
+  box-sizing: border-box;
+  border-radius: 100000px;
+  background-color: black;
+  color: white;
+  font-size: 14px;
+  font-family: "Archivo";
+  font-weight: 500;
+  line-height: 23px;
+  outline: none;
+ }
+
+
+.about-content {
+  width: 100%;
+  max-width: 64rem;
+  padding: 1rem 2rem;
+  margin-top: 80px;
+}
+
+.about-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #1f2937;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.about-prose {
+  max-width: none;
+  margin: 0 auto;
+  line-height: 1.75;
+}
+
+.about-section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.about-section {
+  margin-bottom: 1rem;
+}
+
+.about-text {
+  margin-bottom: 1rem;
+  color: #4b5563;
+}
+
+.about-list {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  color: #374151;
+}
+
+.about-list li {
+  margin-bottom: 0.75rem;
+}
+
+.about-date {
+  font-size: 0.975rem;
+  color: #6b7280;
+  font-weight: 700;
+  margin-bottom: 2rem;
+}
+
+.about-contact {
+  margin-bottom: 1rem;
+}
+
+.about-link {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.about-agreement {
+  margin-top: 5rem;
+  text-align: center;
+  font-size: 1.25rem;
+  color: #374151;
+  font-weight: 700;
+  margin-bottom: 5rem;
+} 

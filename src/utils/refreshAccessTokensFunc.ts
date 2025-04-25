@@ -10,15 +10,19 @@ export const refreshAccessTokensFunc = async (token: string) => {
     const { username }: { username: string } = jwt_decode(token);
     let user = await prisma.user.findFirst({ where: { username: username } });
 
+    if (!user) {
+      return null;
+    }
+
     if (user.google_login) {
       const currentDate = new Date();
-      const expiryDate = new Date(user.google_token_expiry);
+      const expiryDate = new Date(user.google_token_expiry || "");
 
       const isExpired: boolean = expiryDate < currentDate;
 
       if (isExpired) {
         const google_token_data = await refreshGoogleAccessToken(
-          user.google_refresh_token
+          user.google_refresh_token || ""
         );
 
         if (!google_token_data) {
@@ -42,13 +46,13 @@ export const refreshAccessTokensFunc = async (token: string) => {
 
     if (user.outlook_login) {
       const currentDate = new Date();
-      const expiryDate = new Date(user.outlook_token_expiry);
+      const expiryDate = new Date(user.outlook_token_expiry || "");
 
       const isExpired: boolean = expiryDate < currentDate;
 
       if (isExpired) {
         const outlook_token_data = await refreshOutlookAccessToken(
-          user.outlook_refresh_token
+          user.outlook_refresh_token || ""
         );
 
         if (!outlook_token_data) {

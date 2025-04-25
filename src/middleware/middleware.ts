@@ -23,7 +23,7 @@ export const protect: RequestHandler = async (
   }
 
   try {
-    const verify = jwt.verify(token, process.env.JWT_SECRET_REFRESH);
+    const verify = jwt.verify(token, process.env.JWT_SECRET_REFRESH || "");
 
     const { username }: { username: string } = jwt_decode(token);
 

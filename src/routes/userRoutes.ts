@@ -31,6 +31,11 @@ import {
   deleteCalenderEvent,
   getLatestEmails,
   deleteGoogleGmail,
+  performNotionTasks,
+  notionDatabaseList,
+  notionDatabaseProperties,
+  notionDatabaseSummary,
+  lisaCallEndpoint,
 } from "../controllers/user";
 
 import { protect } from "../middleware/middleware";
@@ -71,6 +76,14 @@ userRouter
   .post(protectAgent, refreshAccessToken, deleteGoogleGmail);
 userRouter.route("/getCurrentDateTime").post(protectAgent, getCurrentDateTime);
 userRouter.route("/notionData").post(protectAgent, notionDataApi);
+userRouter.route("/performNotionTasks").post(protectAgent, performNotionTasks);
+userRouter.route("/notionDatabaseList").post(protectAgent, notionDatabaseList);
+userRouter
+  .route("/notionDatabaseProperties")
+  .post(protectAgent, notionDatabaseProperties);
+userRouter
+  .route("/notionDatabaseSummary")
+  .post(protectAgent, notionDatabaseSummary);
 userRouter
   .route("/getProductHuntPosts/:topic")
   .post(protectAgent, getProductHuntPosts);
@@ -103,3 +116,4 @@ userRouter
 userRouter.route("/perplexityNewsPublicApi").post(perplexityApi);
 userRouter.route("/getEventsPublicApi").get(getPublicEvents);
 userRouter.route("/addEvent").post(addEvent);
+userRouter.route("/lisaCallEndpoint").post(lisaCallEndpoint);

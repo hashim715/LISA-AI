@@ -1,6 +1,6 @@
 # Lisa - Your AI Co-Founder
 
-Built by Aazar Jan, Muhammad Hashim and Shahbaz Abdullah Magsi
+Built by Muhammad Hashim, Aazar Jan and Shahbaz Abdullah Magsi
 
 Lisa is an open-source voice assistant designed for founders, operators, and visionaries who move at the speed of life. Built to integrate seamlessly with your existing tools, Lisa acts as your co-founder, handling tasks from email drafting to meeting scheduling with simple voice commands. No more app-switching or tab-juggling—just say it, and Lisa gets it done.
 
